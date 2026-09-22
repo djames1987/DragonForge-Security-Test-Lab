@@ -14,7 +14,7 @@ env:
 jobs:
   phase0:
     name: Phase 0 Foundation
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
