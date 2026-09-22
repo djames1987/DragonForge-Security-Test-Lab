@@ -6,7 +6,7 @@ DFSTL is intentionally maintained as a separate project from the product it test
 
 ## Project status
 
-**Phase 0 — Architecture, Safety Model, and Test Taxonomy: Complete**
+**Phase 0 — Architecture, Safety Model, and Test Taxonomy: Implementation Complete — Verification Pending**
 
 Phase 0 establishes the repository, security boundaries, safety classes, threat model, test taxonomy, roadmap, and a minimal Rust workspace that future phases will extend into the executable test controller.
 
@@ -64,7 +64,7 @@ See [SAFETY.md](SAFETY.md) and [docs/TEST_TAXONOMY.md](docs/TEST_TAXONOMY.md).
 
 ## Roadmap
 
-- Phase 0 — Architecture, safety model, and test taxonomy: **Complete**
+- Phase 0 — Architecture, safety model, and test taxonomy: **Implementation Complete — Verification Pending**
 - Phase 1 — Core runner, evidence logging, and reporting
 - Phase 2 — DragonForge discovery and build identification
 - Phase 3 — Static, dependency, supply-chain, and secret scanning
