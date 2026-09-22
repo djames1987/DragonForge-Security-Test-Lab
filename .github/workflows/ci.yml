@@ -1,0 +1,48 @@
+name: DFSTL CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  phase0:
+    name: Phase 0 Foundation
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        continue-on-error: true
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --workspace
+
+      - name: Phase 0 CLI smoke test
+        shell: pwsh
+        run: |
+          $Output = cargo run -p dfstl-cli -- describe
+          $Output
+          if ($Output -notmatch "phase: 0") { throw "Phase marker missing" }
+          if ($Output -notmatch "default-safety-policy: safe") { throw "Safe-only default missing" }
+          if ($Output -notmatch "active-attack-implementations: none") { throw "Phase 0 safety invariant missing" }
