@@ -1,0 +1,13 @@
+/target/
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.dmp
+/results/
+/artifacts/
+/corpus/generated/
+/lab-state/
+.env
+.env.*
+!.env.example
