@@ -2,7 +2,7 @@
 
 ## Phase 0 — Architecture, Safety Model, and Test Taxonomy
 
-**Status: Complete**
+**Status: Implementation Complete — Verification Pending**
 
 Deliverables:
 - repository charter and architecture;
