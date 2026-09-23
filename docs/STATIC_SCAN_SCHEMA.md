@@ -8,7 +8,8 @@ Phase 3 emits `static-scan.json` and may also print the same structure to stdout
 | --- | --- | --- |
 | schema_version | integer | Phase 3 emits 1 |
 | source_root | string | Explicit source directory scanned |
-| source_fingerprint | string | SHA-256 fingerprint over scanned relative paths and file digests |
+| source_fingerprint | string | SHA-256 fingerprint over discovered relative paths and file digests |
+| coverage_truncated | boolean | True if the 25,000-file discovery cap was reached |
 | counts | object | Aggregate scan counters |
 | dependency_count | integer | Number of Cargo.lock package records |
 | findings | array | Secret and supply-chain findings |
