@@ -1,14 +1,21 @@
 #![forbid(unsafe_code)]
 
 use std::env;
+use std::path::PathBuf;
 
-use dfstl_core::{ExecutionPolicy, SafetyClass};
+use dfstl_core::{
+    Artifact, ExecutionModel, ExecutionPolicy, Runner, SafetyClass, SecurityTest, TestCategory,
+    TestContext, TestDescriptor, TestExecution, TestRegistry,
+};
 
 fn main() {
-    let command = env::args().nth(1).unwrap_or_else(|| "help".to_owned());
+    let mut args = env::args().skip(1);
+    let command = args.next().unwrap_or_else(|| "help".to_owned());
 
     match command.as_str() {
         "describe" => describe(),
+        "list" => list_tests(),
+        "run" => run_command(args.collect()),
         "version" | "--version" | "-V" => {
             println!("dfstl {}", env!("CARGO_PKG_VERSION"));
         }
@@ -24,7 +31,7 @@ fn main() {
 fn describe() {
     let policy = ExecutionPolicy::default();
     println!("DragonForge Security Test Lab");
-    println!("phase: 0");
+    println!("phase: 1");
     println!("default-safety-policy: {}", policy.maximum_class());
     println!(
         "controlled-allowed-by-default: {}",
@@ -38,7 +45,84 @@ fn describe() {
         "lab-only-allowed-by-default: {}",
         policy.allows(SafetyClass::LabOnly)
     );
+    println!("core-runner: available");
+    println!("structured-json-reporting: available");
+    println!("sha256-evidence-manifest: available");
+    println!("bounded-artifacts: available");
     println!("active-attack-implementations: none");
+}
+
+fn registry() -> TestRegistry {
+    let mut registry = TestRegistry::new();
+    registry
+        .register(RunnerSelfCheck)
+        .expect("static built-in test ID must be valid");
+    registry
+        .register(SafetyPolicySelfCheck)
+        .expect("static built-in test ID must be valid");
+    registry
+}
+
+fn list_tests() {
+    let registry = registry();
+    println!("ID                    SAFETY      CATEGORY     NAME");
+    for test in registry.iter() {
+        let descriptor = test.descriptor();
+        println!(
+            "{:<21} {:<11} {:<12} {}",
+            descriptor.id,
+            descriptor.safety,
+            descriptor.category.code(),
+            descriptor.name
+        );
+    }
+}
+
+fn run_command(arguments: Vec<String>) {
+    let mut output = PathBuf::from("results");
+    let mut index = 0_usize;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--output" => {
+                index += 1;
+                let Some(path) = arguments.get(index) else {
+                    eprintln!("--output requires a path");
+                    std::process::exit(2);
+                };
+                output = PathBuf::from(path);
+            }
+            unknown => {
+                eprintln!("unknown run option: {unknown}");
+                std::process::exit(2);
+            }
+        }
+        index += 1;
+    }
+
+    let registry = registry();
+    let runner = Runner::new(ExecutionPolicy::safe_only(), output);
+    let completed = match runner.run(&registry) {
+        Ok(completed) => completed,
+        Err(error) => {
+            eprintln!("DFSTL run failed before report finalization: {error}");
+            std::process::exit(3);
+        }
+    };
+
+    print!("{}", completed.report.to_text());
+    println!("Evidence directory: {}", completed.evidence_dir.display());
+    println!(
+        "Manifest: {}",
+        completed.evidence_dir.join("SHA256SUMS").display()
+    );
+    println!(
+        "JSON report: {}",
+        completed.evidence_dir.join("report.json").display()
+    );
+
+    if completed.report.counts.has_failures() {
+        std::process::exit(1);
+    }
 }
 
 fn help() {
@@ -47,7 +131,70 @@ fn help() {
     println!("Usage: dfstl <command>");
     println!();
     println!("Commands:");
-    println!("  describe   Show the Phase 0 safety/runtime model");
-    println!("  version    Show the CLI version");
-    println!("  help       Show this help");
+    println!("  describe             Show the Phase 1 runtime model");
+    println!("  list                 List registered built-in tests");
+    println!("  run [--output PATH]  Run safe registered tests and write evidence");
+    println!("  version              Show the CLI version");
+    println!("  help                 Show this help");
+}
+
+struct RunnerSelfCheck;
+
+impl SecurityTest for RunnerSelfCheck {
+    fn descriptor(&self) -> &TestDescriptor {
+        static DESCRIPTOR: TestDescriptor = TestDescriptor::new(
+            "STATIC-RUNNER-001",
+            "Core runner execution path",
+            TestCategory::StaticAnalysis,
+            SafetyClass::Safe,
+            ExecutionModel::WhiteBox,
+        );
+        &DESCRIPTOR
+    }
+
+    fn execute(&self, context: &TestContext<'_>) -> Result<TestExecution, String> {
+        let evidence = format!(
+            "run_id={}\nmaximum_safety={}\n",
+            context.run_id,
+            context.policy.maximum_class()
+        );
+        Ok(TestExecution::pass(
+            "runner executed a registered Safe test successfully",
+        )
+        .with_artifact(Artifact::new(
+            "runner-self-check.txt",
+            evidence.into_bytes(),
+        )))
+    }
+}
+
+struct SafetyPolicySelfCheck;
+
+impl SecurityTest for SafetyPolicySelfCheck {
+    fn descriptor(&self) -> &TestDescriptor {
+        static DESCRIPTOR: TestDescriptor = TestDescriptor::new(
+            "STATIC-POLICY-001",
+            "Default safety-policy enforcement",
+            TestCategory::StaticAnalysis,
+            SafetyClass::Safe,
+            ExecutionModel::WhiteBox,
+        );
+        &DESCRIPTOR
+    }
+
+    fn execute(&self, context: &TestContext<'_>) -> Result<TestExecution, String> {
+        if context.policy.allows(SafetyClass::Controlled)
+            || context.policy.allows(SafetyClass::Disruptive)
+            || context.policy.allows(SafetyClass::LabOnly)
+        {
+            return Ok(TestExecution::new(
+                dfstl_core::TestStatus::Fail,
+                "default policy unexpectedly permits a higher-risk class",
+            ));
+        }
+
+        Ok(TestExecution::pass(
+            "default execution policy permits only Safe tests",
+        ))
+    }
 }
