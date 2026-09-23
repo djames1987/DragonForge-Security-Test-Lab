@@ -13,7 +13,7 @@ env:
 
 jobs:
   validation:
-    name: Phase 6 Filesystem Lab
+    name: Phase 7 Sync API Harness
     runs-on: ubuntu-latest
 
     steps:
@@ -38,31 +38,44 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
-      - name: Phase 6 filesystem smoke test
+      - name: Phase 7 sync API smoke test
         shell: pwsh
         run: |
           $Describe = cargo run -p dfstl-cli -- describe
           $Describe
-          if ($Describe -notmatch "phase: 6") { throw "Phase marker missing" }
-          if ($Describe -notmatch "filesystem-lab: available") { throw "Filesystem lab capability missing" }
-          if ($Describe -notmatch "filesystem-lab-safety-class: lab-only") { throw "LabOnly safety marker missing" }
+          if ($Describe -notmatch "phase: 7") { throw "Phase marker missing" }
+          if ($Describe -notmatch "password-manager-sync-api-harness: available") { throw "Sync API capability missing" }
 
           $List = cargo run -p dfstl-cli -- list
           $List
-          if ($List -notmatch "FS-LAB-001") { throw "Phase 6 filesystem test missing" }
+          if ($List -notmatch "API-SYNC-001") { throw "Phase 7 sync API test missing" }
 
-          $Corpus = cargo run -p dfstl-cli -- filesystem path-corpus
-          $Corpus
-          if ($LASTEXITCODE -ne 0) { throw "Path corpus failed" }
+          cargo test -p dfstl-core loopback_probe_exercises_non_state_changing_matrix
+          if ($LASTEXITCODE -ne 0) { throw "Sync API loopback regression failed" }
 
-          New-Item -ItemType Directory -Force -Path ci-phase6 | Out-Null
-          $LabRoot = Join-Path $PWD "ci-phase6/lab"
-          cargo run -p dfstl-cli -- filesystem lab --root $LabRoot --lab-ack --json
-          if ($LASTEXITCODE -ne 0) { throw "Filesystem lab failed" }
+          $Root = Join-Path $PWD "ci-phase7"
+          New-Item -ItemType Directory -Force -Path $Root | Out-Null
+          $Capture = Join-Path $Root "capture.http"
+          $Lines = @(
+            "PUT /v1/vaults/00000000-0000-0000-0000-000000000001 HTTP/1.1",
+            "Host: 127.0.0.1:8787",
+            "Authorization: Bearer 1111111111111111111111111111111111111111111111111111111111111111",
+            "X-DragonForge-Device-Id: 00000000-0000-0000-0000-000000000002",
+            "X-DragonForge-Device-Timestamp: 1000",
+            "X-DragonForge-Device-Signature: aabb",
+            "X-DragonForge-Base-Revision: 7",
+            "Content-Length: 4",
+            "",
+            "test"
+          )
+          [IO.File]::WriteAllText($Capture, [string]::Join([string][char]13 + [char]10, $Lines))
 
-          $Report = Get-Content (Join-Path $LabRoot "filesystem-lab.json") -Raw | ConvertFrom-Json
-          if ($Report.schema_version -ne 1) { throw "Unexpected filesystem lab schema" }
-          if ($Report.has_failures) { throw "Filesystem lab reported a failure" }
+          cargo run -p dfstl-cli -- sync-api mutate --input $Capture --output (Join-Path $Root "mutations") --controlled --json
+          if ($LASTEXITCODE -ne 0) { throw "Sync request mutation smoke test failed" }
+
+          $Corpus = Get-Content (Join-Path $Root "mutations/sync-api-mutations.json") -Raw | ConvertFrom-Json
+          if ($Corpus.schema_version -ne 1) { throw "Unexpected sync mutation schema" }
+          if ($Corpus.cases.Count -ne 12) { throw "Unexpected sync mutation case count" }
 
           cargo run -p dfstl-cli -- run --output ci-safe-results
           if ($LASTEXITCODE -ne 0) { throw "Safe runner regression failed" }
