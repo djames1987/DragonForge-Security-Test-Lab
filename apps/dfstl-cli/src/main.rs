@@ -4,10 +4,11 @@ use std::env;
 use std::path::PathBuf;
 
 use dfstl_core::{
-    Artifact, EXPECTED_EXECUTABLES, ExecutionModel, ExecutionPolicy, ExternalToolStatus,
-    PackageManifestStatus, Runner, SafetyClass, SecurityTest, TargetError, TestCategory,
-    TestContext, TestDescriptor, TestExecution, TestRegistry, inspect_target, resolve_target,
-    run_external_scanners, scan_source, write_scan_bundle,
+    Artifact, EXPECTED_EXECUTABLES, EncryptedFormat, ExecutionModel, ExecutionPolicy,
+    ExternalToolStatus, PackageManifestStatus, Runner, SafetyClass, SecurityTest, TargetError,
+    TestCategory, TestContext, TestDescriptor, TestExecution, TestRegistry,
+    generate_mutation_corpus, inspect_target, resolve_target, run_external_scanners, scan_source,
+    write_scan_bundle,
 };
 
 fn main() {
@@ -29,6 +30,10 @@ fn main() {
             let arguments: Vec<String> = args.collect();
             source_command(&arguments);
         }
+        "format" => {
+            let arguments: Vec<String> = args.collect();
+            format_command(&arguments);
+        }
         "version" | "--version" | "-V" => {
             println!("dfstl {}", env!("CARGO_PKG_VERSION"));
         }
@@ -44,7 +49,7 @@ fn main() {
 fn describe() {
     let policy = ExecutionPolicy::default();
     println!("DragonForge Security Test Lab");
-    println!("phase: 3");
+    println!("phase: 4");
     println!("default-safety-policy: {}", policy.maximum_class());
     println!(
         "controlled-allowed-by-default: {}",
@@ -69,7 +74,10 @@ fn describe() {
     println!("dependency-inventory: available");
     println!("spdx-sbom: available");
     println!("external-scanners: cargo-audit,cargo-deny,gitleaks");
-    println!("active-attack-implementations: none");
+    println!("encrypted-format-mutation: available");
+    println!("mutation-safety-class: controlled");
+    println!("mutation-formats: dfvault,dfbackup,dfshare,dfauth,password-manager-dfvault");
+    println!("active-attack-implementations: encrypted-format-mutation");
 }
 
 fn registry() -> TestRegistry {
@@ -85,6 +93,9 @@ fn registry() -> TestRegistry {
         .expect("static built-in test ID must be valid");
     registry
         .register(StaticScanSelfCheck)
+        .expect("static built-in test ID must be valid");
+    registry
+        .register(EncryptedFormatMutationSelfCheck)
         .expect("static built-in test ID must be valid");
     registry
 }
@@ -106,6 +117,7 @@ fn list_tests() {
 
 fn run_command(arguments: &[String]) {
     let mut output = PathBuf::from("results");
+    let mut controlled = false;
     let mut index = 0_usize;
     while index < arguments.len() {
         match arguments[index].as_str() {
@@ -117,6 +129,7 @@ fn run_command(arguments: &[String]) {
                 };
                 output = PathBuf::from(path);
             }
+            "--controlled" => controlled = true,
             unknown => {
                 eprintln!("unknown run option: {unknown}");
                 std::process::exit(2);
@@ -126,7 +139,12 @@ fn run_command(arguments: &[String]) {
     }
 
     let registry = registry();
-    let runner = Runner::new(ExecutionPolicy::safe_only(), output);
+    let policy = if controlled {
+        ExecutionPolicy::controlled()
+    } else {
+        ExecutionPolicy::safe_only()
+    };
+    let runner = Runner::new(policy, output);
     let completed = match runner.run(&registry) {
         Ok(completed) => completed,
         Err(error) => {
@@ -350,18 +368,121 @@ fn source_scan(arguments: &[String]) {
     }
 }
 
+fn format_command(arguments: &[String]) {
+    let Some(subcommand) = arguments.first() else {
+        eprintln!("format requires a subcommand: mutate");
+        std::process::exit(2);
+    };
+
+    match subcommand.as_str() {
+        "mutate" => format_mutate(&arguments[1..]),
+        other => {
+            eprintln!("unknown format subcommand: {other}");
+            std::process::exit(2);
+        }
+    }
+}
+
+fn format_mutate(arguments: &[String]) {
+    let mut format = None;
+    let mut input = None;
+    let mut output = None;
+    let mut controlled = false;
+    let mut json = false;
+    let mut index = 0_usize;
+
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--format" => {
+                index += 1;
+                let Some(value) = arguments.get(index) else {
+                    eprintln!("--format requires a value");
+                    std::process::exit(2);
+                };
+                format = EncryptedFormat::parse(value);
+                if format.is_none() {
+                    eprintln!("unsupported encrypted format: {value}");
+                    std::process::exit(2);
+                }
+            }
+            "--input" => {
+                index += 1;
+                let Some(path) = arguments.get(index) else {
+                    eprintln!("--input requires a path");
+                    std::process::exit(2);
+                };
+                input = Some(PathBuf::from(path));
+            }
+            "--output" => {
+                index += 1;
+                let Some(path) = arguments.get(index) else {
+                    eprintln!("--output requires a path");
+                    std::process::exit(2);
+                };
+                output = Some(PathBuf::from(path));
+            }
+            "--controlled" => controlled = true,
+            "--json" => json = true,
+            unknown => {
+                eprintln!("unknown format mutate option: {unknown}");
+                std::process::exit(2);
+            }
+        }
+        index += 1;
+    }
+
+    if !controlled {
+        eprintln!(
+            "encrypted-format mutation is Controlled-class; rerun with explicit --controlled"
+        );
+        std::process::exit(6);
+    }
+
+    let Some(format) = format else {
+        eprintln!("format mutate requires --format NAME");
+        std::process::exit(2);
+    };
+    let Some(input) = input else {
+        eprintln!("format mutate requires --input PATH");
+        std::process::exit(2);
+    };
+    let Some(output) = output else {
+        eprintln!("format mutate requires --output PATH");
+        std::process::exit(2);
+    };
+
+    let corpus = match generate_mutation_corpus(&input, format, &output) {
+        Ok(corpus) => corpus,
+        Err(error) => {
+            eprintln!("encrypted-format mutation failed: {error}");
+            std::process::exit(3);
+        }
+    };
+
+    if json {
+        print!("{}", corpus.to_json_pretty());
+    } else {
+        print!("{}", corpus.to_text());
+        println!("Corpus directory: {}", corpus.output_dir.display());
+        println!("Manifest: {}", corpus.output_dir.join("SHA256SUMS").display());
+    }
+}
+
 fn help() {
     println!("DragonForge Security Test Lab");
     println!();
     println!("Usage: dfstl <command>");
     println!();
     println!("Commands:");
-    println!("  describe                         Show the Phase 3 runtime model");
+    println!("  describe                         Show the Phase 4 runtime model");
     println!("  list                             List registered built-in tests");
-    println!("  run [--output PATH]              Run safe registered tests and write evidence");
+    println!("  run [--output PATH] [--controlled]");
+    println!("                                   Run registered tests within an explicit safety policy");
     println!("  target inspect --target PATH     Identify an explicit local DragonForge build");
     println!("  source scan --source PATH        Run built-in static/dependency/secret scans");
     println!("    [--output PATH] [--json] [--external]");
+    println!("  format mutate --format NAME      Generate bounded adversarial encrypted inputs");
+    println!("    --input PATH --output PATH --controlled [--json]");
     println!("  version                          Show the CLI version");
     println!("  help                 Show this help");
 }
@@ -472,6 +593,34 @@ impl SecurityTest for StaticScanSelfCheck {
     fn execute(&self, _context: &TestContext<'_>) -> Result<TestExecution, String> {
         Ok(TestExecution::pass(
             "built-in static, dependency, SBOM, supply-chain, and secret scanning is available",
+        ))
+    }
+}
+
+struct EncryptedFormatMutationSelfCheck;
+
+impl SecurityTest for EncryptedFormatMutationSelfCheck {
+    fn descriptor(&self) -> &TestDescriptor {
+        static DESCRIPTOR: TestDescriptor = TestDescriptor::new(
+            "PARSER-MUTATE-001",
+            "Encrypted-format mutation capability",
+            TestCategory::Parser,
+            SafetyClass::Controlled,
+            ExecutionModel::WhiteBox,
+        );
+        &DESCRIPTOR
+    }
+
+    fn execute(&self, context: &TestContext<'_>) -> Result<TestExecution, String> {
+        if !context.policy.allows(SafetyClass::Controlled) {
+            return Ok(TestExecution::new(
+                dfstl_core::TestStatus::Fail,
+                "Controlled mutation test executed without Controlled policy",
+            ));
+        }
+
+        Ok(TestExecution::pass(
+            "bounded encrypted-format mutation capability is authorized",
         ))
     }
 }
