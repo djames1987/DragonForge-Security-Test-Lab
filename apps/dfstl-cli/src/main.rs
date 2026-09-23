@@ -846,7 +846,9 @@ fn sync_api_mutate_command(arguments: &[String]) {
     }
 
     if !controlled {
-        eprintln!("sync API request mutation is Controlled-class; rerun with explicit --controlled");
+        eprintln!(
+            "sync API request mutation is Controlled-class; rerun with explicit --controlled"
+        );
         std::process::exit(6);
     }
 
