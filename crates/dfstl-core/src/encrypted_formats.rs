@@ -809,9 +809,7 @@ mod tests {
         fs::create_dir(&output).expect("output");
         fs::write(output.join("sentinel.txt"), b"keep").expect("sentinel");
 
-        assert!(
-            generate_mutation_corpus(&seed, EncryptedFormat::Authenticator, &output).is_err()
-        );
+        assert!(generate_mutation_corpus(&seed, EncryptedFormat::Authenticator, &output).is_err());
         assert_eq!(
             fs::read(output.join("sentinel.txt")).expect("sentinel"),
             b"keep"
