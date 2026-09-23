@@ -151,7 +151,11 @@ impl AgentAttackReport {
         let _ = writeln!(output, "  \"all_expected\": {},", self.all_expected());
         let _ = writeln!(output, "  \"cases\": [");
         for (index, case) in self.cases.iter().enumerate() {
-            let comma = if index + 1 == self.cases.len() { "" } else { "," };
+            let comma = if index + 1 == self.cases.len() {
+                ""
+            } else {
+                ","
+            };
             let _ = writeln!(output, "    {{");
             let _ = writeln!(output, "      \"id\": \"{}\",", json_escape(&case.id));
             let _ = writeln!(
@@ -159,11 +163,7 @@ impl AgentAttackReport {
                 "      \"expected\": \"{}\",",
                 json_escape(&case.expected)
             );
-            let _ = writeln!(
-                output,
-                "      \"outcome\": \"{}\",",
-                case.outcome.as_str()
-            );
+            let _ = writeln!(output, "      \"outcome\": \"{}\",", case.outcome.as_str());
             let _ = writeln!(
                 output,
                 "      \"detail\": \"{}\"",
@@ -237,7 +237,7 @@ impl RuntimeMutationCorpus {
     }
 }
 
-/// Runs bounded black-box attacks against one explicit DragonForge Agent runtime.
+/// Runs bounded black-box attacks against one explicit `DragonForge` Agent runtime.
 ///
 /// # Errors
 ///
@@ -271,6 +271,20 @@ pub fn run_agent_attack_harness(
         return Err(AgentHarnessError::NonLoopbackTarget);
     }
 
+    let mut cases = build_attack_cases(address, &key);
+    if cases.len() > MAX_ATTACK_CASES {
+        cases.truncate(MAX_ATTACK_CASES);
+    }
+
+    Ok(AgentAttackReport {
+        schema_version: 1,
+        runtime,
+        cases,
+    })
+}
+
+
+fn build_attack_cases(address: SocketAddrV4, key: &[u8]) -> Vec<AttackCaseResult> {
     let now = now_ms();
     let mut cases = Vec::new();
 
@@ -290,6 +304,7 @@ pub fn run_agent_attack_harness(
     ));
     cases.push(send_idle_case(address));
 
+    let invalid_tag = "00".repeat(32);
     let reconnect_failures = (0_u8..8)
         .map(|index| {
             let request = RequestSpec::new(
@@ -302,7 +317,7 @@ pub fn run_agent_attack_harness(
                 "reconnect-probe",
                 "rejected",
                 &request,
-                "00".repeat(32),
+                &invalid_tag,
             )
         })
         .filter(|result| matches!(result.outcome, AttackOutcome::TransportError))
@@ -318,24 +333,23 @@ pub fn run_agent_attack_harness(
         detail: format!("8 sequential reconnect probes; transport_failures={reconnect_failures}"),
     });
 
-    let nonce = deterministic_nonce(1);
-    let unsigned = RequestSpec::new(1001, now, nonce.clone());
+    let unsigned = RequestSpec::new(1001, now, deterministic_nonce(1));
     cases.push(send_request_case(
         address,
         "invalid-hmac",
         "rejected",
         &unsigned,
-        "00".repeat(32),
+        &invalid_tag,
     ));
 
     let mut wrong_source = RequestSpec::new(1002, now, deterministic_nonce(2));
-    wrong_source.source = "security-scanner".to_owned();
+    "security-scanner".clone_into(&mut wrong_source.source);
     cases.push(send_signed_case(
         address,
         "wrong-source",
         "rejected",
         &wrong_source,
-        &key,
+        key,
     ));
 
     let mut wrong_protocol = RequestSpec::new(1003, now, deterministic_nonce(3));
@@ -345,7 +359,7 @@ pub fn run_agent_attack_harness(
         "wrong-protocol-major",
         "rejected",
         &wrong_protocol,
-        &key,
+        key,
     ));
 
     let stale = RequestSpec::new(
@@ -358,7 +372,7 @@ pub fn run_agent_attack_harness(
         "stale-timestamp",
         "rejected",
         &stale,
-        &key,
+        key,
     ));
 
     let future = RequestSpec::new(
@@ -371,7 +385,7 @@ pub fn run_agent_attack_harness(
         "future-timestamp",
         "rejected",
         &future,
-        &key,
+        key,
     ));
 
     let invalid_nonce = RequestSpec::new(1006, now, "AA==".to_owned());
@@ -380,7 +394,7 @@ pub fn run_agent_attack_harness(
         "invalid-nonce-length",
         "rejected",
         &invalid_nonce,
-        &key,
+        key,
     ));
 
     let valid = RequestSpec::new(1007, now_ms(), deterministic_nonce(7));
@@ -389,25 +403,17 @@ pub fn run_agent_attack_harness(
         "valid-health",
         "accepted",
         &valid,
-        &key,
+        key,
     ));
     cases.push(send_signed_case(
         address,
         "replayed-nonce",
         "rejected",
         &valid,
-        &key,
+        key,
     ));
 
-    if cases.len() > MAX_ATTACK_CASES {
-        cases.truncate(MAX_ATTACK_CASES);
-    }
-
-    Ok(AgentAttackReport {
-        schema_version: 1,
-        runtime,
-        cases,
-    })
+    cases
 }
 
 /// Generates a disposable runtime-file mutation corpus without changing the live
@@ -501,7 +507,10 @@ pub fn generate_runtime_mutation_corpus(
         schema_version: 1,
         cases,
     };
-    fs::write(output_dir.join("runtime-mutations.json"), corpus.to_json_pretty())?;
+    fs::write(
+        output_dir.join("runtime-mutations.json"),
+        corpus.to_json_pretty(),
+    )?;
     Ok(corpus)
 }
 
@@ -545,7 +554,8 @@ fn parse_runtime(text: &str) -> Result<AgentRuntime, AgentHarnessError> {
         pid: json_u64(text, "pid")
             .and_then(|value| u32::try_from(value).ok())
             .ok_or(AgentHarnessError::MalformedRuntime)?,
-        started_at_ms: json_u64(text, "started_at_ms").ok_or(AgentHarnessError::MalformedRuntime)?,
+        started_at_ms: json_u64(text, "started_at_ms")
+            .ok_or(AgentHarnessError::MalformedRuntime)?,
     })
 }
 
@@ -626,7 +636,7 @@ fn send_signed_case(
     key: &[u8],
 ) -> AttackCaseResult {
     let tag = hex_digest(&hmac_sha256(key, request.message().as_bytes()));
-    send_request_case(address, id, expected, request, tag)
+    send_request_case(address, id, expected, request, &tag)
 }
 
 fn send_request_case(
@@ -634,9 +644,9 @@ fn send_request_case(
     id: &str,
     expected: &str,
     request: &RequestSpec,
-    tag: String,
+    tag: &str,
 ) -> AttackCaseResult {
-    send_raw_case(address, id, expected, request.json(&tag).as_bytes())
+    send_raw_case(address, id, expected, request.json(tag).as_bytes())
 }
 
 fn send_idle_case(address: SocketAddrV4) -> AttackCaseResult {
@@ -809,8 +819,7 @@ fn hmac_sha256(key: &[u8], message: &[u8]) -> [u8; 32] {
 }
 
 fn base64_encode(bytes: &[u8]) -> String {
-    const TABLE: &[u8; 64] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut output = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for chunk in bytes.chunks(3) {
         let first = u32::from(chunk[0]);
@@ -838,19 +847,25 @@ fn base64_encode(bytes: &[u8]) -> String {
 }
 
 fn base64_decode(value: &str) -> Option<Vec<u8>> {
-    if !value.len().is_multiple_of(4) {
+    if value.len() % 4 != 0 {
         return None;
     }
     let mut output = Vec::with_capacity(value.len() / 4 * 3);
     for chunk in value.as_bytes().chunks_exact(4) {
         let a = base64_value(chunk[0])?;
         let b = base64_value(chunk[1])?;
-        let c = if chunk[2] == b'=' { 0 } else { base64_value(chunk[2])? };
-        let d = if chunk[3] == b'=' { 0 } else { base64_value(chunk[3])? };
-        let value = (u32::from(a) << 18)
-            | (u32::from(b) << 12)
-            | (u32::from(c) << 6)
-            | u32::from(d);
+        let c = if chunk[2] == b'=' {
+            0
+        } else {
+            base64_value(chunk[2])?
+        };
+        let d = if chunk[3] == b'=' {
+            0
+        } else {
+            base64_value(chunk[3])?
+        };
+        let value =
+            (u32::from(a) << 18) | (u32::from(b) << 12) | (u32::from(c) << 6) | u32::from(d);
         output.push(u8::try_from((value >> 16) & 0xff).expect("decoded base64 byte"));
         if chunk[2] != b'=' {
             output.push(u8::try_from((value >> 8) & 0xff).expect("decoded base64 byte"));
@@ -922,8 +937,8 @@ mod tests {
 
     use super::{
         AgentAttackReport, AgentRuntime, AttackCaseResult, AttackOutcome, RuntimeMutationCorpus,
-        base64_decode, base64_encode, generate_runtime_mutation_corpus, hmac_sha256,
-        json_u64, run_agent_attack_harness,
+        base64_decode, base64_encode, generate_runtime_mutation_corpus, hmac_sha256, json_u64,
+        run_agent_attack_harness,
     };
     use crate::hash::hex_digest;
 
@@ -977,7 +992,6 @@ mod tests {
         assert!(report.all_expected());
     }
 
-
     #[test]
     fn loopback_attack_harness_exercises_expected_matrix() {
         let root = temp_path("live-runtime");
@@ -989,8 +1003,9 @@ mod tests {
         let runtime = format!(
             concat!(
                 "{{\"format_version\":1,\"protocol_major\":1,\"protocol_minor\":1,",
-                "\"port\":{port},\"pid\":7,\"started_at_ms\":9}}"
-            )
+                "\"port\":{},\"pid\":7,\"started_at_ms\":9}}"
+            ),
+            port
         );
         fs::write(root.join("agent-runtime.json"), runtime.as_bytes()).expect("runtime");
         fs::write(
@@ -1039,12 +1054,7 @@ mod tests {
                 .iter()
                 .any(|case| case.id == "bounded-reconnect-stress")
         );
-        assert!(
-            report
-                .cases
-                .iter()
-                .any(|case| case.id == "replayed-nonce")
-        );
+        assert!(report.cases.iter().any(|case| case.id == "replayed-nonce"));
 
         handle.join().expect("mock server");
         fs::remove_dir_all(root).expect("cleanup");
