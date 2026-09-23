@@ -678,6 +678,7 @@ fn json_escape(value: &str) -> String {
 mod tests {
     use std::fs;
     use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::{path_policy_corpus, run_filesystem_lab, validate_windows_relative_path};
 
