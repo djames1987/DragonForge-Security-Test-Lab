@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+pub mod encrypted_formats;
 pub mod evidence;
 pub mod hash;
 pub mod model;
@@ -7,6 +8,10 @@ pub mod runner;
 pub mod static_scan;
 pub mod target;
 
+pub use encrypted_formats::{
+    EncryptedFormat, MAX_SEED_BYTES, MutationCase, MutationCorpus, MutationError,
+    generate_mutation_corpus,
+};
 pub use evidence::{EvidenceError, EvidenceLimits, EvidenceSession};
 pub use hash::{Sha256, hex_digest, sha256_bytes, sha256_file};
 pub use model::{
