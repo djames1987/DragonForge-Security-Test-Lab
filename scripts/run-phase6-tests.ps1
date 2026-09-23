@@ -156,9 +156,15 @@ try {
         Invoke-LoggedCommand "Release tests" "cargo" @("test", "--workspace", "--release", "--", "--nocapture") | Out-Null
     }
 
-    Invoke-LoggedCommand "Debug CLI build" "cargo" @("build", "-p", "dfstl-cli") | Out-Null
-    $CliPath = Join-Path $RepoRoot "target\debug\dfstl-cli.exe"
-    Assert-True "debug DFSTL CLI exists" (Test-Path -LiteralPath $CliPath -PathType Leaf)
+    $CliPath = Join-Path $RepoRoot "target\release\dfstl-cli.exe"
+    if (Test-Path -LiteralPath $CliPath -PathType Leaf) {
+        Remove-Item -LiteralPath $CliPath -Force
+    }
+    Invoke-LoggedCommand "Fresh release CLI build" "cargo" @("build", "-p", "dfstl-cli", "--release") | Out-Null
+    Assert-True "fresh release DFSTL CLI exists" (Test-Path -LiteralPath $CliPath -PathType Leaf)
+    if (-not (Test-Path -LiteralPath $CliPath -PathType Leaf)) {
+        throw "Fresh Phase 6 CLI build did not produce an executable; refusing to run stale CLI checks."
+    }
 
     Write-Section "CLI Phase 6 model"
     $Describe = Capture-NativeOutput $CliPath @("describe")
