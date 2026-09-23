@@ -8,7 +8,7 @@ Phase 3 adds a Safe-class, read-only source security scanner plus explicit integ
 
 ## DragonForge Security Suite baseline
 
-Phase 3 was designed against the current Security Suite source layout and controls on 2026-09-23.
+Phase 3 was designed against the Security Suite source layout and controls on 2026-09-23 at Security Suite commit `8174cf37b66366380bb9289bf23419fcc935802a`.
 
 The Suite currently includes:
 
