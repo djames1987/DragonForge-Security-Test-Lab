@@ -158,13 +158,13 @@ impl SecurityTest for RunnerSelfCheck {
             context.run_id,
             context.policy.maximum_class()
         );
-        Ok(TestExecution::pass(
-            "runner executed a registered Safe test successfully",
+        Ok(
+            TestExecution::pass("runner executed a registered Safe test successfully")
+                .with_artifact(Artifact::new(
+                    "runner-self-check.txt",
+                    evidence.into_bytes(),
+                )),
         )
-        .with_artifact(Artifact::new(
-            "runner-self-check.txt",
-            evidence.into_bytes(),
-        )))
     }
 }
 
