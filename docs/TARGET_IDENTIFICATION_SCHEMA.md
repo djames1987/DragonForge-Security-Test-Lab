@@ -12,6 +12,7 @@ This document is separate from the Phase 1 run-report schema.
 
 | Field | Type | Meaning |
 | --- | --- | --- |
+| schema_version | integer | Target identification schema version; Phase 2 emits 1 |
 | root | string | Resolved local DragonForge target directory |
 | complete | boolean | Whether all current expected executables are present |
 | build_fingerprint | string | SHA-256 fingerprint derived from the executable identity set |
