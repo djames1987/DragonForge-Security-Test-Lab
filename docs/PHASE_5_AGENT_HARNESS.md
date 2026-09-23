@@ -2,7 +2,7 @@
 
 ## Status
 
-**Implementation Complete — Verification Pending**
+**Verified Complete**
 
 Phase 5 adds a bounded, black-box, Controlled-class attack harness for the DragonForge Agent's authenticated loopback IPC boundary.
 
@@ -197,13 +197,37 @@ The validator checks:
 - Controlled runner pass behavior;
 - release build.
 
-## Exit criteria
+## Verification record
 
-Phase 5 is verified when the release-mode validator ends with:
+Phase 5 was locally verified on Windows on 2026-09-23 against commit:
 
 ```text
-Warnings: 0
-Failures: 0
+9b4440a820d66b540b87cb85e16337c35bce3e39
+```
 
-PHASE 5 VALIDATION: PASS
+The release-mode validation completed with:
+
+- a clean `main` branch;
+- rustfmt passing;
+- strict Clippy passing with warnings denied;
+- 42 debug tests passing;
+- 42 release tests passing;
+- the dedicated loopback Agent harness regression passing;
+- the RFC 4231 HMAC-SHA256 regression passing;
+- Phase 5 CLI capability checks passing;
+- Controlled-class registration confirmed;
+- live Agent attack refusal without `--controlled` confirmed;
+- all eight cloned runtime/startup-race fixtures generated;
+- source runtime descriptor hash preserved;
+- source session credential hash preserved;
+- Safe runner skipping Controlled tests;
+- Controlled runner passing all six registered tests;
+- release build succeeding;
+- zero warnings and zero failures.
+
+Validation evidence:
+
+```text
+phase5-validation-20260923-171456.log
+SHA-256: BD80108169E425A3BE718D7A6DD1AF9A701F96EF3B629D4FD21A99B61707CD62
 ```
