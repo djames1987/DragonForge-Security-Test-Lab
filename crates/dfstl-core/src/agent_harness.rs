@@ -812,15 +812,19 @@ fn base64_encode(bytes: &[u8]) -> String {
         let second = u32::from(*chunk.get(1).unwrap_or(&0));
         let third = u32::from(*chunk.get(2).unwrap_or(&0));
         let value = (first << 16) | (second << 8) | third;
-        output.push(char::from(TABLE[((value >> 18) & 0x3f) as usize]));
-        output.push(char::from(TABLE[((value >> 12) & 0x3f) as usize]));
+        let index0 = u8::try_from((value >> 18) & 0x3f).expect("base64 index");
+        let index1 = u8::try_from((value >> 12) & 0x3f).expect("base64 index");
+        output.push(char::from(TABLE[usize::from(index0)]));
+        output.push(char::from(TABLE[usize::from(index1)]));
         if chunk.len() > 1 {
-            output.push(char::from(TABLE[((value >> 6) & 0x3f) as usize]));
+            let index2 = u8::try_from((value >> 6) & 0x3f).expect("base64 index");
+            output.push(char::from(TABLE[usize::from(index2)]));
         } else {
             output.push('=');
         }
         if chunk.len() > 2 {
-            output.push(char::from(TABLE[(value & 0x3f) as usize]));
+            let index3 = u8::try_from(value & 0x3f).expect("base64 index");
+            output.push(char::from(TABLE[usize::from(index3)]));
         } else {
             output.push('=');
         }
@@ -829,7 +833,7 @@ fn base64_encode(bytes: &[u8]) -> String {
 }
 
 fn base64_decode(value: &str) -> Option<Vec<u8>> {
-    if value.len() % 4 != 0 {
+    if !value.len().is_multiple_of(4) {
         return None;
     }
     let mut output = Vec::with_capacity(value.len() / 4 * 3);
@@ -842,12 +846,12 @@ fn base64_decode(value: &str) -> Option<Vec<u8>> {
             | (u32::from(b) << 12)
             | (u32::from(c) << 6)
             | u32::from(d);
-        output.push(((value >> 16) & 0xff) as u8);
+        output.push(u8::try_from((value >> 16) & 0xff).expect("decoded base64 byte"));
         if chunk[2] != b'=' {
-            output.push(((value >> 8) & 0xff) as u8);
+            output.push(u8::try_from((value >> 8) & 0xff).expect("decoded base64 byte"));
         }
         if chunk[3] != b'=' {
-            output.push((value & 0xff) as u8);
+            output.push(u8::try_from(value & 0xff).expect("decoded base64 byte"));
         }
     }
     Some(output)
@@ -983,7 +987,7 @@ mod tests {
                 "\"port\":{port},\"pid\":7,\"started_at_ms\":9}}"
             )
         );
-        fs::write(root.join("agent-runtime.json"), runtime).expect("runtime");
+        fs::write(root.join("agent-runtime.json"), runtime.as_bytes()).expect("runtime");
         fs::write(
             root.join("agent-session.key"),
             format!("{}\n", base64_encode(&key)),
@@ -1046,7 +1050,10 @@ mod tests {
         let root = temp_path("runtime");
         let output = temp_path("mutations");
         fs::create_dir(&root).expect("root");
-        let runtime = br#"{"format_version":1,"protocol_major":1,"protocol_minor":1,"port":1234,"pid":7,"started_at_ms":9}"#;
+        let runtime = concat!(
+            r#"{"format_version":1,"protocol_major":1,"protocol_minor":1,"#,
+            r#""port":1234,"pid":7,"started_at_ms":9}"#
+        );
         let credential = format!("{}\n", base64_encode(&[9_u8; 32]));
         fs::write(root.join("agent-runtime.json"), runtime).expect("runtime");
         fs::write(root.join("agent-session.key"), &credential).expect("credential");
