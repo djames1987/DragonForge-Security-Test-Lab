@@ -120,7 +120,10 @@ impl AgentAttackReport {
     #[must_use]
     pub fn all_expected(&self) -> bool {
         self.cases.iter().all(|case| match case.expected.as_str() {
-            "rejected" => matches!(case.outcome, AttackOutcome::Rejected | AttackOutcome::NoResponse),
+            "rejected" => matches!(
+                case.outcome,
+                AttackOutcome::Rejected | AttackOutcome::NoResponse
+            ),
             "accepted" => matches!(case.outcome, AttackOutcome::Accepted),
             _ => false,
         })
@@ -240,7 +243,9 @@ impl RuntimeMutationCorpus {
 ///
 /// Returns an error when runtime metadata or the credential cannot be read,
 /// validated, or connected to over IPv4 loopback.
-pub fn run_agent_attack_harness(runtime_dir: &Path) -> Result<AgentAttackReport, AgentHarnessError> {
+pub fn run_agent_attack_harness(
+    runtime_dir: &Path,
+) -> Result<AgentAttackReport, AgentHarnessError> {
     let runtime_path = runtime_dir.join("agent-runtime.json");
     let credential_path = runtime_dir.join("agent-session.key");
     validate_regular_file(&runtime_path, true)?;
