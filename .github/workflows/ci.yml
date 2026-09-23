@@ -13,7 +13,7 @@ env:
 
 jobs:
   validation:
-    name: Phase 4 Encrypted Format Mutation
+    name: Phase 5 Agent Harness
     runs-on: ubuntu-latest
 
     steps:
@@ -38,28 +38,38 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
-      - name: Phase 4 CLI smoke test
+      - name: Phase 5 Agent harness smoke test
         shell: pwsh
         run: |
           $Describe = cargo run -p dfstl-cli -- describe
           $Describe
-          if ($Describe -notmatch "phase: 4") { throw "Phase marker missing" }
-          if ($Describe -notmatch "encrypted-format-mutation: available") { throw "Mutation capability missing" }
-          if ($Describe -notmatch "mutation-safety-class: controlled") { throw "Controlled safety marker missing" }
+          if ($Describe -notmatch "phase: 5") { throw "Phase marker missing" }
+          if ($Describe -notmatch "agent-attack-harness: available") { throw "Agent harness capability missing" }
+          if ($Describe -notmatch "agent-harness-safety-class: controlled") { throw "Agent safety marker missing" }
 
           $List = cargo run -p dfstl-cli -- list
           $List
-          if ($List -notmatch "PARSER-MUTATE-001") { throw "Phase 4 mutation test missing" }
+          if ($List -notmatch "IPC-AGENT-001") { throw "Phase 5 Agent test missing" }
 
-          New-Item -ItemType Directory -Force -Path ci-fixtures | Out-Null
-          Set-Content -LiteralPath ci-fixtures/pm.dfvault -NoNewline -Value '{"version":1,"vault_id":"ci","items":[]}'
+          cargo test -p dfstl-core loopback_attack_harness_exercises_expected_matrix
+          if ($LASTEXITCODE -ne 0) { throw "Loopback Agent harness regression failed" }
 
-          cargo run -p dfstl-cli -- format mutate --format password-manager --input ci-fixtures/pm.dfvault --output ci-corpus --controlled --json
-          if ($LASTEXITCODE -ne 0) { throw "Controlled mutation failed" }
+          $Runtime = Join-Path $PWD "ci-agent-runtime"
+          New-Item -ItemType Directory -Force -Path $Runtime | Out-Null
+          @'
+{"format_version":1,"protocol_major":1,"protocol_minor":1,"port":6553,"pid":7,"started_at_ms":1}
+'@ | Set-Content -LiteralPath (Join-Path $Runtime "agent-runtime.json") -NoNewline
+          [IO.File]::WriteAllText(
+            (Join-Path $Runtime "agent-session.key"),
+            ([Convert]::ToBase64String([byte[]](1..32 | ForEach-Object { 9 })) + [Environment]::NewLine)
+          )
 
-          $Corpus = Get-Content ci-corpus/corpus.json -Raw | ConvertFrom-Json
-          if ($Corpus.schema_version -ne 1) { throw "Unexpected corpus schema" }
-          if ($Corpus.cases.Count -ne 8) { throw "Unexpected Password Manager mutation count" }
+          cargo run -p dfstl-cli -- agent runtime-mutate --runtime-dir $Runtime --output ci-agent-mutations --controlled --json
+          if ($LASTEXITCODE -ne 0) { throw "Runtime mutation smoke test failed" }
+
+          $Corpus = Get-Content ci-agent-mutations/runtime-mutations.json -Raw | ConvertFrom-Json
+          if ($Corpus.schema_version -ne 1) { throw "Unexpected runtime mutation schema" }
+          if ($Corpus.cases.Count -ne 8) { throw "Unexpected runtime mutation case count" }
 
           cargo run -p dfstl-cli -- run --output ci-safe-results
           if ($LASTEXITCODE -ne 0) { throw "Safe runner regression failed" }
