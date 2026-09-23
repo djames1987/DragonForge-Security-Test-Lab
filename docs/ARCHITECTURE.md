@@ -59,7 +59,10 @@ Phase 1 extends it with:
 - deterministic mutation manifests and seed identity binding;
 - Controlled black-box Agent loopback attack harness;
 - independent HMAC-SHA256 wire generation;
-- cloned Agent runtime/startup-race fixture generation.
+- cloned Agent runtime/startup-race fixture generation;
+- LabOnly disposable filesystem/reparse/TOCTOU execution;
+- deterministic Windows path-policy regression corpus;
+- filesystem-lab evidence manifests that avoid following reparse links.
 
 It intentionally does not contain adversarial attack implementations through Phase 1.
 
@@ -109,7 +112,7 @@ A test report must record which model was used.
 1. Unknown safety state fails closed.
 2. Default policy permits Safe tests only.
 3. A higher-risk test cannot silently downgrade its metadata.
-4. Target/source/seed/runtime paths must be explicit before scanning or adversarial testing; ambiguous target discovery fails closed.
+4. Target/source/seed/runtime/lab paths must be explicit before scanning or adversarial testing; ambiguous target discovery fails closed.
 5. Evidence must not intentionally contain real secrets.
 6. Every test has a stable identifier.
 7. A failed tester/infrastructure action is not reported as a target vulnerability.
