@@ -88,13 +88,24 @@ impl fmt::Display for MutationError {
                 write!(f, "seed file exceeds {MAX_SEED_BYTES} bytes: {size}")
             }
             Self::OutputExists(path) => {
-                write!(f, "mutation output directory already exists: {}", path.display())
+                write!(
+                    f,
+                    "mutation output directory already exists: {}",
+                    path.display()
+                )
             }
             Self::OutputInsideInput(path) => {
-                write!(f, "mutation output cannot alias the seed path: {}", path.display())
+                write!(
+                    f,
+                    "mutation output cannot alias the seed path: {}",
+                    path.display()
+                )
             }
             Self::SeedTooShort { required, actual } => {
-                write!(f, "seed is too short: requires {required} bytes, got {actual}")
+                write!(
+                    f,
+                    "seed is too short: requires {required} bytes, got {actual}"
+                )
             }
             Self::UnsupportedSeed(reason) => {
                 write!(f, "seed does not match format profile: {reason}")
@@ -148,7 +159,11 @@ impl MutationCorpus {
         let _ = writeln!(output, "  \"seed_size_bytes\": {},", self.seed_size_bytes);
         let _ = writeln!(output, "  \"cases\": [");
         for (index, case) in self.cases.iter().enumerate() {
-            let comma = if index + 1 == self.cases.len() { "" } else { "," };
+            let comma = if index + 1 == self.cases.len() {
+                ""
+            } else {
+                ","
+            };
             let _ = writeln!(output, "    {{");
             let _ = writeln!(output, "      \"id\": \"{}\",", json_escape(&case.id));
             let _ = writeln!(
@@ -212,9 +227,7 @@ pub fn generate_mutation_corpus(
 
     let seed_sha256 = hex_digest(&sha256_bytes(&seed));
     let raw_cases = match format {
-        EncryptedFormat::FileVault | EncryptedFormat::Authenticator => {
-            binary_argon_cases(&seed)
-        }
+        EncryptedFormat::FileVault | EncryptedFormat::Authenticator => binary_argon_cases(&seed),
         EncryptedFormat::Backup | EncryptedFormat::SecureShare => binary_length_cases(&seed),
         EncryptedFormat::PasswordManagerVault => password_manager_cases(&seed)?,
     };
@@ -281,8 +294,9 @@ fn validate_seed(format: EncryptedFormat, seed: &[u8]) -> Result<(), MutationErr
         EncryptedFormat::Backup => validate_binary_seed(seed, b"DFBACKUP", 46),
         EncryptedFormat::SecureShare => validate_binary_seed(seed, b"DFSHARE!", 46),
         EncryptedFormat::PasswordManagerVault => {
-            let text = std::str::from_utf8(seed)
-                .map_err(|_| MutationError::UnsupportedSeed("vault JSON is not UTF-8".to_owned()))?;
+            let text = std::str::from_utf8(seed).map_err(|_| {
+                MutationError::UnsupportedSeed("vault JSON is not UTF-8".to_owned())
+            })?;
             if !text.trim_start().starts_with('{') || !text.contains("\"version\"") {
                 return Err(MutationError::UnsupportedSeed(
                     "expected JSON object containing a version field".to_owned(),
@@ -397,32 +411,33 @@ fn common_binary_cases(
     header_len: usize,
     version_offset: usize,
 ) -> Vec<(String, String, Vec<u8>)> {
-    let mut cases = Vec::new();
-    cases.push((
-        "empty".to_owned(),
-        "zero-byte container".to_owned(),
-        Vec::new(),
-    ));
-    cases.push((
-        "truncate-one".to_owned(),
-        "container truncated to one byte".to_owned(),
-        seed[..1].to_vec(),
-    ));
-    cases.push((
-        "truncate-header-minus-one".to_owned(),
-        "container truncated one byte before full header".to_owned(),
-        seed[..header_len - 1].to_vec(),
-    ));
-    cases.push((
-        "truncate-header".to_owned(),
-        "container truncated exactly at header boundary".to_owned(),
-        seed[..header_len].to_vec(),
-    ));
-    cases.push((
-        "truncate-half".to_owned(),
-        "container truncated at midpoint".to_owned(),
-        seed[..seed.len() / 2].to_vec(),
-    ));
+    let mut cases = vec![
+        (
+            "empty".to_owned(),
+            "zero-byte container".to_owned(),
+            Vec::new(),
+        ),
+        (
+            "truncate-one".to_owned(),
+            "container truncated to one byte".to_owned(),
+            seed[..1].to_vec(),
+        ),
+        (
+            "truncate-header-minus-one".to_owned(),
+            "container truncated one byte before full header".to_owned(),
+            seed[..header_len - 1].to_vec(),
+        ),
+        (
+            "truncate-header".to_owned(),
+            "container truncated exactly at header boundary".to_owned(),
+            seed[..header_len].to_vec(),
+        ),
+        (
+            "truncate-half".to_owned(),
+            "container truncated at midpoint".to_owned(),
+            seed[..seed.len() / 2].to_vec(),
+        ),
+    ];
 
     let mut bad_magic = seed.to_vec();
     bad_magic[0] ^= 0xff;
@@ -484,9 +499,7 @@ fn common_binary_cases(
     cases
 }
 
-fn password_manager_cases(
-    seed: &[u8],
-) -> Result<Vec<(String, String, Vec<u8>)>, MutationError> {
+fn password_manager_cases(seed: &[u8]) -> Result<Vec<(String, String, Vec<u8>)>, MutationError> {
     let text = std::str::from_utf8(seed)
         .map_err(|_| MutationError::UnsupportedSeed("vault JSON is not UTF-8".to_owned()))?;
     let mut cases = vec![
@@ -532,7 +545,7 @@ fn password_manager_cases(
     let mut first_byte_tamper = seed.to_vec();
     if let Some(index) = first_byte_tamper
         .iter()
-        .position(|byte| byte.is_ascii_alphanumeric())
+        .position(u8::is_ascii_alphanumeric)
     {
         first_byte_tamper[index] ^= 0x01;
     }
@@ -675,9 +688,9 @@ mod tests {
         ))
     }
 
-    fn argon_seed(magic: &[u8; 4]) -> Vec<u8> {
+    fn argon_seed(magic: [u8; 4]) -> Vec<u8> {
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(magic);
+        bytes.extend_from_slice(&magic);
         bytes.extend_from_slice(&1_u16.to_le_bytes());
         bytes.extend_from_slice(&65_536_u32.to_le_bytes());
         bytes.extend_from_slice(&3_u32.to_le_bytes());
@@ -688,10 +701,10 @@ mod tests {
         bytes
     }
 
-    fn length_seed(magic: &[u8; 8]) -> Vec<u8> {
+    fn length_seed(magic: [u8; 8]) -> Vec<u8> {
         let ciphertext = [0x66_u8; 32];
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(magic);
+        bytes.extend_from_slice(&magic);
         bytes.extend_from_slice(&1_u16.to_le_bytes());
         bytes.extend_from_slice(&[7_u8; 16]);
         bytes.extend_from_slice(&[9_u8; 12]);
@@ -709,7 +722,7 @@ mod tests {
 
     #[test]
     fn file_vault_corpus_contains_argon_and_tamper_cases() {
-        let seed = write_seed("dfvault", &argon_seed(b"DFV1"));
+        let seed = write_seed("dfvault", &argon_seed(*b"DFV1"));
         let output = temp_path("dfvault-out");
         let corpus =
             generate_mutation_corpus(&seed, EncryptedFormat::FileVault, &output).expect("corpus");
@@ -725,7 +738,7 @@ mod tests {
 
     #[test]
     fn authenticator_profile_rejects_wrong_magic() {
-        let seed = write_seed("wrong-auth", &argon_seed(b"DFV1"));
+        let seed = write_seed("wrong-auth", &argon_seed(*b"DFV1"));
         let output = temp_path("wrong-auth-out");
         assert!(
             generate_mutation_corpus(&seed, EncryptedFormat::Authenticator, &output).is_err()
@@ -735,7 +748,7 @@ mod tests {
 
     #[test]
     fn backup_corpus_contains_length_boundary_cases() {
-        let seed = write_seed("backup", &length_seed(b"DFBACKUP"));
+        let seed = write_seed("backup", &length_seed(*b"DFBACKUP"));
         let output = temp_path("backup-out");
         let corpus =
             generate_mutation_corpus(&seed, EncryptedFormat::Backup, &output).expect("corpus");
@@ -754,7 +767,7 @@ mod tests {
 
     #[test]
     fn secure_share_profile_accepts_current_magic() {
-        let seed = write_seed("share", &length_seed(b"DFSHARE!"));
+        let seed = write_seed("share", &length_seed(*b"DFSHARE!"));
         let output = temp_path("share-out");
         let corpus =
             generate_mutation_corpus(&seed, EncryptedFormat::SecureShare, &output).expect("corpus");
@@ -787,7 +800,7 @@ mod tests {
 
     #[test]
     fn existing_output_is_never_overwritten() {
-        let seed = write_seed("existing", &argon_seed(b"DFA1"));
+        let seed = write_seed("existing", &argon_seed(*b"DFA1"));
         let output = temp_path("existing-out");
         fs::create_dir(&output).expect("output");
         fs::write(output.join("sentinel.txt"), b"keep").expect("sentinel");
