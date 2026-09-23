@@ -232,6 +232,7 @@ impl TargetInspection {
     pub fn to_json_pretty(&self) -> String {
         let mut output = String::new();
         let _ = writeln!(output, "{{");
+        let _ = writeln!(output, "  \"schema_version\": 1,");
         let _ = writeln!(
             output,
             "  \"root\": \"{}\",",
@@ -627,6 +628,7 @@ fn json_escape(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::path::{Path, PathBuf};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::{
