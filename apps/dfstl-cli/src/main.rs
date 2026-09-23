@@ -95,12 +95,10 @@ fn describe() {
     println!("filesystem-lab-safety-class: lab-only");
     println!("windows-reparse-testing: available");
     println!("toctou-race-testing: disposable-only");
-    println!(
-        concat!(
-            "active-attack-implementations: encrypted-format-mutation,",
-            "agent-loopback-harness,filesystem-lab"
-        )
-    );
+    println!(concat!(
+        "active-attack-implementations: encrypted-format-mutation,",
+        "agent-loopback-harness,filesystem-lab"
+    ));
 }
 
 fn registry() -> TestRegistry {
