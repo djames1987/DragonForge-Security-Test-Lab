@@ -13,7 +13,7 @@ env:
 
 jobs:
   validation:
-    name: Phase 2 Target Discovery
+    name: Phase 3 Static Security
     runs-on: ubuntu-latest
 
     steps:
@@ -38,42 +38,57 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
-      - name: Phase 2 CLI smoke test
+      - name: Phase 3 CLI smoke test
         shell: pwsh
         run: |
           $Describe = cargo run -p dfstl-cli -- describe
           $Describe
-          if ($Describe -notmatch "phase: 2") { throw "Phase marker missing" }
-          if ($Describe -notmatch "expected-suite-executables: 11") { throw "Package contract mismatch" }
+          if ($Describe -notmatch "phase: 3") { throw "Phase marker missing" }
+          if ($Describe -notmatch "static-source-scan: available") { throw "Static scan capability missing" }
+          if ($Describe -notmatch "spdx-sbom: available") { throw "SBOM capability missing" }
 
           $List = cargo run -p dfstl-cli -- list
           $List
-          if ($List -notmatch "STATIC-TARGET-001") { throw "Phase 2 self-check missing" }
+          if ($List -notmatch "STATIC-SUPPLY-001") { throw "Phase 3 self-check missing" }
 
-          $Root = Join-Path $PWD "ci-target"
-          New-Item -ItemType Directory -Force -Path $Root | Out-Null
-          $Names = @(
-            "dragonforge-desktop.exe",
-            "dragonforge-security-center.exe",
-            "dragonforge-file-vault.exe",
-            "dragonforge-authenticator.exe",
-            "dragonforge-security-scanner.exe",
-            "dragonforge-integrity-monitor.exe",
-            "dragonforge-network-guard.exe",
-            "dragonforge-backup-recovery.exe",
-            "dragonforge-secure-share.exe",
-            "dragonforge-agent.exe",
-            "dragonforge-privileged-service.exe"
-          )
-          foreach ($Name in $Names) {
-            Set-Content -LiteralPath (Join-Path $Root $Name) -Value $Name -NoNewline
-          }
+          $Root = Join-Path $PWD "ci-source"
+          $WorkflowDir = Join-Path $Root ".github/workflows"
+          New-Item -ItemType Directory -Force -Path $WorkflowDir | Out-Null
 
-          $Json = cargo run -p dfstl-cli -- target inspect --target $Root --json
-          if ($LASTEXITCODE -ne 0) { throw "Target inspection failed" }
-          $Report = $Json | ConvertFrom-Json
-          if (-not $Report.complete) { throw "Synthetic target was not complete" }
-          if ($Report.executables.Count -ne 11) { throw "Unexpected executable count" }
+          @'
+[package]
+name = "ci-fixture"
+version = "0.1.0"
+edition = "2024"
+'@ | Set-Content -LiteralPath (Join-Path $Root "Cargo.toml")
+
+          @'
+version = 4
+
+[[package]]
+name = "ci-fixture"
+version = "0.1.0"
+'@ | Set-Content -LiteralPath (Join-Path $Root "Cargo.lock")
+
+          @'
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@0123456789abcdef0123456789abcdef01234567
+'@ | Set-Content -LiteralPath (Join-Path $WorkflowDir "ci.yml")
+
+          cargo run -p dfstl-cli -- source scan --source $Root --output ci-static --json
+          if ($LASTEXITCODE -ne 0) { throw "Built-in static scan failed" }
+
+          $Report = Get-Content ci-static/static-scan.json -Raw | ConvertFrom-Json
+          if ($Report.schema_version -ne 1) { throw "Unexpected static scan schema" }
+          if ($Report.counts.high_findings -ne 0) { throw "Unexpected high finding" }
+
+          $Sbom = Get-Content ci-static/sbom.spdx.json -Raw | ConvertFrom-Json
+          if ($Sbom.spdxVersion -ne "SPDX-2.3") { throw "Unexpected SBOM version" }
 
           cargo run -p dfstl-cli -- run --output ci-results
           if ($LASTEXITCODE -ne 0) { throw "Safe runner regression failed" }
