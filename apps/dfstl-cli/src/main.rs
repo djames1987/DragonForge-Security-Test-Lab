@@ -96,7 +96,10 @@ fn describe() {
     println!("windows-reparse-testing: available");
     println!("toctou-race-testing: disposable-only");
     println!(
-        "active-attack-implementations: encrypted-format-mutation,agent-loopback-harness,filesystem-lab"
+        concat!(
+            "active-attack-implementations: encrypted-format-mutation,",
+            "agent-loopback-harness,filesystem-lab"
+        )
     );
 }
 
