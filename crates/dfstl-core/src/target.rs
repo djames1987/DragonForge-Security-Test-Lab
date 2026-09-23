@@ -475,9 +475,7 @@ fn unexpected_executables(root: &Path) -> Result<Vec<String>, TargetError> {
         let is_executable = Path::new(&name)
             .extension()
             .is_some_and(|extension| extension.eq_ignore_ascii_case("exe"));
-        if lower.starts_with("dragonforge-")
-            && is_executable
-            && !expected.contains(lower.as_str())
+        if lower.starts_with("dragonforge-") && is_executable && !expected.contains(lower.as_str())
         {
             unexpected.push(name);
         }
