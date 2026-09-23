@@ -84,7 +84,9 @@ impl fmt::Display for MutationError {
             Self::SymlinkRejected(path) => {
                 write!(f, "seed symlink is not allowed: {}", path.display())
             }
-            Self::SeedTooLarge(size) => write!(f, "seed file exceeds {MAX_SEED_BYTES} bytes: {size}"),
+            Self::SeedTooLarge(size) => {
+                write!(f, "seed file exceeds {MAX_SEED_BYTES} bytes: {size}")
+            }
             Self::OutputExists(path) => {
                 write!(f, "mutation output directory already exists: {}", path.display())
             }
@@ -94,7 +96,9 @@ impl fmt::Display for MutationError {
             Self::SeedTooShort { required, actual } => {
                 write!(f, "seed is too short: requires {required} bytes, got {actual}")
             }
-            Self::UnsupportedSeed(reason) => write!(f, "seed does not match format profile: {reason}"),
+            Self::UnsupportedSeed(reason) => {
+                write!(f, "seed does not match format profile: {reason}")
+            }
         }
     }
 }
