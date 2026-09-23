@@ -6,11 +6,11 @@ DFSTL is intentionally maintained as a separate project from the product it test
 
 ## Project status
 
-**Phase 2 — DragonForge Discovery and Build Identification: Verified Complete**
+**Phase 3 — Static, Dependency, Supply-Chain, and Secret Scanning: Implementation Complete — Verification Pending**
 
-Phases 0 and 1 are verified complete. Phase 2 adds explicit local DragonForge target selection, package completeness checks, per-executable SHA-256 identification, BUILD-INFO parsing, checksum-manifest validation, deterministic build fingerprints, and fail-closed ambiguity handling.
+Phases 0 through 2 are verified complete. Phase 3 adds bounded source scanning, Cargo.lock dependency inventory, deterministic SPDX 2.3 SBOM generation, high-confidence secret detection, GitHub Actions supply-chain checks, and explicit cargo-audit/cargo-deny/gitleaks integrations.
 
-No destructive security tests are implemented through Phase 2.
+No destructive security tests are implemented through Phase 3.
 
 ## Design principles
 
@@ -41,7 +41,9 @@ DragonForge-Security-Test-Lab/
 │   ├── PHASE_0_FOUNDATION.md
 │   ├── PHASE_1_CORE_RUNNER.md
 │   ├── PHASE_2_TARGET_DISCOVERY.md
+│   ├── PHASE_3_STATIC_SUPPLY_CHAIN.md
 │   ├── REPORT_SCHEMA.md
+│   ├── STATIC_SCAN_SCHEMA.md
 │   ├── TARGET_IDENTIFICATION_SCHEMA.md
 │   ├── ROADMAP.md
 │   ├── TEST_TAXONOMY.md
@@ -71,7 +73,7 @@ See [SAFETY.md](SAFETY.md) and [docs/TEST_TAXONOMY.md](docs/TEST_TAXONOMY.md).
 - Phase 0 — Architecture, safety model, and test taxonomy: **Verified Complete**
 - Phase 1 — Core runner, evidence logging, and reporting: **Verified Complete**
 - Phase 2 — DragonForge discovery and build identification: **Verified Complete**
-- Phase 3 — Static, dependency, supply-chain, and secret scanning
+- Phase 3 — Static, dependency, supply-chain, and secret scanning: **Implementation Complete — Verification Pending**
 - Phase 4 — Encrypted-format adversarial testing
 - Phase 5 — DragonForge Agent attack harness
 - Phase 6 — Filesystem, reparse-point, and TOCTOU laboratory
@@ -107,6 +109,25 @@ cargo run -p dfstl-cli -- target inspect --target C:\DragonForge-Test-Build --js
 DFSTL reads and hashes the explicit target; it does not execute DragonForge binaries. The current Windows package contract contains 11 expected executables.
 
 See [docs/PHASE_2_TARGET_DISCOVERY.md](docs/PHASE_2_TARGET_DISCOVERY.md) and [docs/TARGET_IDENTIFICATION_SCHEMA.md](docs/TARGET_IDENTIFICATION_SCHEMA.md).
+
+## Phase 3 source scanning
+
+```powershell
+cargo run -p dfstl-cli -- source scan --source C:\DragonForge-Security-Suite --output .\results\suite-static
+cargo run -p dfstl-cli -- source scan --source C:\DragonForge-Security-Suite --output .\results\suite-static --external
+```
+
+Built-in scanning is read-only and produces `static-scan.json`, `static-scan.txt`, `dependency-inventory.json`, and `sbom.spdx.json`. External tool coverage is reported separately so missing tools are never treated as a clean pass.
+
+See [docs/PHASE_3_STATIC_SUPPLY_CHAIN.md](docs/PHASE_3_STATIC_SUPPLY_CHAIN.md) and [docs/STATIC_SCAN_SCHEMA.md](docs/STATIC_SCAN_SCHEMA.md).
+
+## Local Phase 3 validation
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-phase3-tests.ps1 -Release
+```
+
+The validator uses only disposable synthetic source fixtures and verifies dependency/SBOM output, workflow findings, secret detection/redaction, and the Safe runner regression.
 
 ## Local Phase 2 validation
 
