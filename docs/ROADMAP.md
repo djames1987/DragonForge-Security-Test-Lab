@@ -65,15 +65,18 @@ Delivered:
 
 ## Phase 5 — DragonForge Agent Attack Harness
 
-Planned:
-- unauthenticated clients;
-- invalid HMAC;
-- replay;
-- timestamp boundaries;
+**Status: Implementation Complete — Verification Pending**
+
+Delivered:
+- malformed and unauthenticated client behavior;
+- invalid HMAC rejection;
+- nonce replay testing;
+- stale/future timestamp boundaries;
 - malformed/oversized messages;
-- idle socket and reconnect stress;
-- runtime-file manipulation;
-- startup race testing.
+- bounded idle socket and reconnect stress;
+- cloned runtime-file manipulation corpus;
+- fresh/stale startup-lock race fixtures;
+- deterministic loopback mock-Agent regression.
 
 ## Phase 6 — Filesystem, Reparse-Point, and TOCTOU Lab
 
