@@ -172,6 +172,11 @@ pub fn sha256_bytes(data: &[u8]) -> [u8; 32] {
     hasher.finalize()
 }
 
+/// Computes SHA-256 for a file using bounded streaming reads.
+///
+/// # Errors
+///
+/// Returns an I/O error if the file cannot be opened or read.
 pub fn sha256_file(path: &Path) -> io::Result<[u8; 32]> {
     let mut file = File::open(path)?;
     let mut hasher = Sha256::new();
