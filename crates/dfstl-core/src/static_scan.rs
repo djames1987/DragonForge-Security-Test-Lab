@@ -101,6 +101,7 @@ pub struct StaticScanReport {
     pub schema_version: u32,
     pub source_root: PathBuf,
     pub source_fingerprint: String,
+    pub coverage_truncated: bool,
     pub counts: ScanCounts,
     pub findings: Vec<StaticFinding>,
     pub dependencies: Vec<DependencyRecord>,
@@ -126,6 +127,11 @@ impl StaticScanReport {
             output,
             "  \"source_fingerprint\": \"{}\",",
             self.source_fingerprint
+        );
+        let _ = writeln!(
+            output,
+            "  \"coverage_truncated\": {},",
+            self.coverage_truncated
         );
         let _ = writeln!(output, "  \"counts\": {{");
         let _ = writeln!(
@@ -192,7 +198,8 @@ impl StaticScanReport {
         let _ = writeln!(output, "DragonForge static security scan");
         let _ = writeln!(output, "Source: {}", self.source_root.display());
         let _ = writeln!(output, "Fingerprint: {}", self.source_fingerprint);
-        let _ = writeln!(output, "Files scanned: {}", self.counts.files_scanned);
+        let _ = writeln!(output, "Coverage truncated: {}", self.coverage_truncated);
+        let _ = writeln!(output, "Files discovered: {}", self.counts.files_scanned);
         let _ = writeln!(output, "Dependencies: {}", self.dependencies.len());
         let _ = writeln!(output, "Secret findings: {}", self.counts.secret_findings);
         let _ = writeln!(
@@ -282,6 +289,7 @@ pub fn scan_source(root: &Path) -> Result<StaticScanReport, StaticScanError> {
     let mut files = Vec::new();
     collect_files(root, root, &mut files)?;
     files.sort();
+    let coverage_truncated = files.len() >= MAX_SCAN_FILES;
 
     let mut findings = Vec::new();
     let mut fingerprint_material = Vec::new();
@@ -337,6 +345,7 @@ pub fn scan_source(root: &Path) -> Result<StaticScanReport, StaticScanError> {
         schema_version: 1,
         source_root: root.to_path_buf(),
         source_fingerprint,
+        coverage_truncated,
         counts,
         findings,
         dependencies,
