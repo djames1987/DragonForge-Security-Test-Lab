@@ -24,9 +24,8 @@ pub use encrypted_formats::{
 };
 pub use evidence::{EvidenceError, EvidenceLimits, EvidenceSession};
 pub use filesystem_lab::{
-    FilesystemLabError, FilesystemLabReport, LabCase, LabCaseStatus, MAX_LAB_CASES,
-    PathCorpusCase, PathCorpusReport, path_policy_corpus, run_filesystem_lab,
-    validate_windows_relative_path,
+    FilesystemLabError, FilesystemLabReport, LabCase, LabCaseStatus, MAX_LAB_CASES, PathCorpusCase,
+    PathCorpusReport, path_policy_corpus, run_filesystem_lab, validate_windows_relative_path,
 };
 pub use hash::{Sha256, hex_digest, sha256_bytes, sha256_file};
 pub use model::{
