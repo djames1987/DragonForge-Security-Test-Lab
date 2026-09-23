@@ -203,6 +203,8 @@ try {
         Invoke-LoggedCommand "Release tests" "cargo" @("test", "--workspace", "--release", "--", "--nocapture") | Out-Null
     }
 
+    Invoke-LoggedCommand "Debug CLI build" "cargo" @("build", "-p", "dfstl-cli") | Out-Null
+
     $CliPath = Join-Path $RepoRoot "target\debug\dfstl-cli.exe"
     Assert-True "debug DFSTL CLI exists" (Test-Path -LiteralPath $CliPath -PathType Leaf)
 
