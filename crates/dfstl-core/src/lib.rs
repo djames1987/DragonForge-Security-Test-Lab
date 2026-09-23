@@ -4,6 +4,7 @@ pub mod evidence;
 pub mod hash;
 pub mod model;
 pub mod runner;
+pub mod target;
 
 pub use evidence::{EvidenceError, EvidenceLimits, EvidenceSession};
 pub use hash::{Sha256, hex_digest, sha256_bytes, sha256_file};
@@ -13,6 +14,10 @@ pub use model::{
 pub use runner::{
     Artifact, CompletedRun, RunCounts, RunReport, Runner, SecurityTest, TestContext, TestExecution,
     TestRecord, TestRegistry,
+};
+pub use target::{
+    BuildInfo, EXPECTED_EXECUTABLES, PackageManifestStatus, TargetError, TargetExecutable,
+    TargetInspection, discover_candidates, inspect_target, resolve_target,
 };
 
 #[cfg(test)]
