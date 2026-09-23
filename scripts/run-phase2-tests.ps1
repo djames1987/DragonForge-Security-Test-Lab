@@ -203,8 +203,11 @@ try {
         Invoke-LoggedCommand "Release tests" "cargo" @("test", "--workspace", "--release", "--", "--nocapture") | Out-Null
     }
 
+    $CliPath = Join-Path $RepoRoot "target\debug\dfstl-cli.exe"
+    Assert-True "debug DFSTL CLI exists" (Test-Path -LiteralPath $CliPath -PathType Leaf)
+
     Write-Section "CLI Phase 2 model"
-    $Describe = Capture-NativeOutput "cargo" @("run", "-p", "dfstl-cli", "--", "describe")
+    $Describe = Capture-NativeOutput $CliPath @("describe")
     Write-Log $Describe.Output
     Write-Log ("Exit code: {0}" -f $Describe.ExitCode)
     Assert-True "describe exits successfully" ($Describe.ExitCode -eq 0)
@@ -215,7 +218,7 @@ try {
     Assert-Match "No active attack implementations" $Describe.Output "active-attack-implementations:\s*none"
 
     Write-Section "Registered Safe tests"
-    $List = Capture-NativeOutput "cargo" @("run", "-p", "dfstl-cli", "--", "list")
+    $List = Capture-NativeOutput $CliPath @("list")
     Write-Log $List.Output
     Write-Log ("Exit code: {0}" -f $List.ExitCode)
     Assert-True "list exits successfully" ($List.ExitCode -eq 0)
@@ -230,9 +233,8 @@ try {
     $CompleteTarget = Join-Path $FixtureRoot "complete-target"
     New-SyntheticTarget -Path $CompleteTarget -WithMetadata -WithManifest
 
-    $Inspect = Capture-NativeOutput "cargo" @(
-        "run", "-p", "dfstl-cli", "--", "target", "inspect",
-        "--target", $CompleteTarget, "--json"
+    $Inspect = Capture-NativeOutput $CliPath @(
+        "target", "inspect", "--target", $CompleteTarget, "--json"
     )
     Write-Log $Inspect.Output
     Write-Log ("Exit code: {0}" -f $Inspect.ExitCode)
@@ -240,6 +242,7 @@ try {
 
     try {
         $TargetReport = $Inspect.Output | ConvertFrom-Json
+        Assert-True "target schema_version is 1" ($TargetReport.schema_version -eq 1)
         Assert-True "target is complete" ($TargetReport.complete -eq $true)
         Assert-True "all 11 executables identified" ($TargetReport.executables.Count -eq 11)
         Assert-True "manifest validates" ($TargetReport.manifest_status -eq "valid")
@@ -260,9 +263,8 @@ try {
     $SingleParent = Join-Path $FixtureRoot "single-parent"
     $SingleChild = Join-Path $SingleParent "DragonForge-Security-Suite-v9.9.9-dfstl-win-x64"
     New-SyntheticTarget -Path $SingleChild -WithMetadata -WithManifest
-    $Single = Capture-NativeOutput "cargo" @(
-        "run", "-p", "dfstl-cli", "--", "target", "inspect",
-        "--target", $SingleParent, "--json"
+    $Single = Capture-NativeOutput $CliPath @(
+        "target", "inspect", "--target", $SingleParent, "--json"
     )
     Write-Log $Single.Output
     Write-Log ("Exit code: {0}" -f $Single.ExitCode)
@@ -272,9 +274,8 @@ try {
     $IncompleteTarget = Join-Path $FixtureRoot "incomplete-target"
     New-SyntheticTarget -Path $IncompleteTarget -WithMetadata -WithManifest
     Remove-Item -LiteralPath (Join-Path $IncompleteTarget "dragonforge-agent.exe") -Force
-    $Incomplete = Capture-NativeOutput "cargo" @(
-        "run", "-p", "dfstl-cli", "--", "target", "inspect",
-        "--target", $IncompleteTarget, "--json"
+    $Incomplete = Capture-NativeOutput $CliPath @(
+        "target", "inspect", "--target", $IncompleteTarget, "--json"
     )
     Write-Log $Incomplete.Output
     Write-Log ("Exit code: {0}" -f $Incomplete.ExitCode)
@@ -292,9 +293,8 @@ try {
     $AmbiguousParent = Join-Path $FixtureRoot "ambiguous-parent"
     New-SyntheticTarget -Path (Join-Path $AmbiguousParent "build-a") -WithMetadata -WithManifest
     New-SyntheticTarget -Path (Join-Path $AmbiguousParent "build-b") -WithMetadata -WithManifest
-    $Ambiguous = Capture-NativeOutput "cargo" @(
-        "run", "-p", "dfstl-cli", "--", "target", "inspect",
-        "--target", $AmbiguousParent, "--json"
+    $Ambiguous = Capture-NativeOutput $CliPath @(
+        "target", "inspect", "--target", $AmbiguousParent, "--json"
     )
     Write-Log $Ambiguous.Output
     Write-Log ("Exit code: {0}" -f $Ambiguous.ExitCode)
@@ -303,7 +303,7 @@ try {
 
     Write-Section "Safe runner regression"
     $EvidenceRoot = Join-Path $RunRoot "runner-evidence"
-    $Run = Capture-NativeOutput "cargo" @("run", "-p", "dfstl-cli", "--", "run", "--output", $EvidenceRoot)
+    $Run = Capture-NativeOutput $CliPath @("run", "--output", $EvidenceRoot)
     Write-Log $Run.Output
     Write-Log ("Exit code: {0}" -f $Run.ExitCode)
     Assert-True "Safe runner still exits successfully" ($Run.ExitCode -eq 0)
