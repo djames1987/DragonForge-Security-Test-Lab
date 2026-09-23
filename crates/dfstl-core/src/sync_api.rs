@@ -610,7 +610,12 @@ fn send_http(
     stream.set_write_timeout(Some(IO_TIMEOUT))?;
 
     let mut request = format!(
-        "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nConnection: close\r\nContent-Length: {}\r\n",
+        concat!(
+            "{method} {path} HTTP/1.1\r\n",
+            "Host: 127.0.0.1:{}\r\n",
+            "Connection: close\r\n",
+            "Content-Length: {}\r\n"
+        ),
         endpoint.port(),
         body.len()
     );
@@ -927,7 +932,9 @@ mod tests {
                     ""
                 };
                 let response = format!(
-                    "HTTP/1.1 {status} {reason}\r\n{extra}Content-Length: 0\r\nConnection: close\r\n\r\n"
+                    "HTTP/1.1 {status} {reason}\r\n",
+                    "{extra}Content-Length: 0\r\n",
+                    "Connection: close\r\n\r\n"
                 );
                 stream.write_all(response.as_bytes()).expect("response");
             }
@@ -946,7 +953,10 @@ mod tests {
         let source = concat!(
             "PUT /v1/vaults/00000000-0000-0000-0000-000000000001 HTTP/1.1\r\n",
             "Host: 127.0.0.1:8787\r\n",
-            "Authorization: Bearer 1111111111111111111111111111111111111111111111111111111111111111\r\n",
+            concat!(
+                "Authorization: Bearer ",
+                "1111111111111111111111111111111111111111111111111111111111111111\r\n"
+            ),
             "X-DragonForge-Device-Id: 00000000-0000-0000-0000-000000000002\r\n",
             "X-DragonForge-Device-Timestamp: 1000\r\n",
             "X-DragonForge-Device-Signature: aabb\r\n",
