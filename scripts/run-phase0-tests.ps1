@@ -159,6 +159,7 @@ try {
 
     $RequiredFiles = @(
         "Cargo.toml",
+        "Cargo.lock",
         "rust-toolchain.toml",
         "README.md",
         "SAFETY.md",
