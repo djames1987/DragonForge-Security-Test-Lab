@@ -6,7 +6,7 @@ DFSTL is intentionally maintained as a separate project from the product it test
 
 ## Project status
 
-**Phase 0 — Architecture, Safety Model, and Test Taxonomy: Verified Complete**
+**Phase 1 — Core Runner, Evidence Logging, and Reporting: Implementation Complete — Verification Pending**
 
 Phase 0 establishes the repository, security boundaries, safety classes, threat model, test taxonomy, roadmap, and a minimal Rust workspace that future phases will extend into the executable test controller.
 
@@ -65,7 +65,7 @@ See [SAFETY.md](SAFETY.md) and [docs/TEST_TAXONOMY.md](docs/TEST_TAXONOMY.md).
 ## Roadmap
 
 - Phase 0 — Architecture, safety model, and test taxonomy: **Verified Complete**
-- Phase 1 — Core runner, evidence logging, and reporting
+- Phase 1 — Core runner, evidence logging, and reporting: **Implementation Complete — Verification Pending**
 - Phase 2 — DragonForge discovery and build identification
 - Phase 3 — Static, dependency, supply-chain, and secret scanning
 - Phase 4 — Encrypted-format adversarial testing
@@ -80,6 +80,27 @@ See [SAFETY.md](SAFETY.md) and [docs/TEST_TAXONOMY.md](docs/TEST_TAXONOMY.md).
 - Phase 13 — CI security gates and release validation
 
 See [docs/ROADMAP.md](docs/ROADMAP.md).
+
+## Phase 1 runner
+
+```powershell
+cargo run -p dfstl-cli -- list
+cargo run -p dfstl-cli -- run --output .\results
+```
+
+Each completed run creates a finalized evidence directory containing `report.json`, `report.txt`, `SHA256SUMS`, and any per-test artifacts.
+
+See [docs/PHASE_1_CORE_RUNNER.md](docs/PHASE_1_CORE_RUNNER.md) and [docs/REPORT_SCHEMA.md](docs/REPORT_SCHEMA.md).
+
+## Local Phase 1 validation
+
+Run the full Windows validation harness:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-phase1-tests.ps1 -Release
+```
+
+The validator independently parses the generated JSON report and recomputes every evidence-manifest SHA-256. It writes a timestamped log and SHA-256 sidecar under `test-logs/`.
 
 ## Local Phase 0 validation
 
