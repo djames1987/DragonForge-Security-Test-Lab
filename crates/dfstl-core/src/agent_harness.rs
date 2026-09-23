@@ -283,6 +283,35 @@ pub fn run_agent_attack_harness(runtime_dir: &Path) -> Result<AgentAttackReport,
         "rejected",
         &oversized,
     ));
+    cases.push(send_idle_case(address));
+
+    let reconnect_failures = (0_u8..8)
+        .map(|index| {
+            let request = RequestSpec::new(
+                9000 + u64::from(index),
+                now_ms(),
+                deterministic_nonce(32 + index),
+            );
+            send_request_case(
+                address,
+                "reconnect-probe",
+                "rejected",
+                &request,
+                "00".repeat(32),
+            )
+        })
+        .filter(|result| matches!(result.outcome, AttackOutcome::TransportError))
+        .count();
+    cases.push(AttackCaseResult {
+        id: "bounded-reconnect-stress".to_owned(),
+        expected: "accepted".to_owned(),
+        outcome: if reconnect_failures == 0 {
+            AttackOutcome::Accepted
+        } else {
+            AttackOutcome::TransportError
+        },
+        detail: format!("8 sequential reconnect probes; transport_failures={reconnect_failures}"),
+    });
 
     let nonce = deterministic_nonce(1);
     let unsigned = RequestSpec::new(1001, now, nonce.clone());
@@ -443,6 +472,20 @@ pub fn generate_runtime_mutation_corpus(
         "credential-wrong-length/agent-session.key",
         b"AA==\n",
     )?;
+    write_runtime_case(
+        output_dir,
+        &mut cases,
+        "startup-fresh-lock",
+        "startup-fresh-lock/agent.lock",
+        b"",
+    )?;
+    write_runtime_case(
+        output_dir,
+        &mut cases,
+        "startup-stale-lock",
+        "startup-stale-lock/agent.lock",
+        b"stale-lock-fixture",
+    )?;
 
     let baseline = output_dir.join("baseline");
     fs::create_dir(&baseline)?;
@@ -589,6 +632,55 @@ fn send_request_case(
     tag: String,
 ) -> AttackCaseResult {
     send_raw_case(address, id, expected, request.json(&tag).as_bytes())
+}
+
+fn send_idle_case(address: SocketAddrV4) -> AttackCaseResult {
+    match TcpStream::connect_timeout(&address.into(), CONNECT_TIMEOUT) {
+        Ok(stream) => {
+            let _ = stream.set_read_timeout(Some(IO_TIMEOUT));
+            let mut reader = BufReader::new(stream);
+            let mut line = String::new();
+            match reader.read_line(&mut line) {
+                Ok(0) => AttackCaseResult {
+                    id: "idle-socket-timeout".to_owned(),
+                    expected: "rejected".to_owned(),
+                    outcome: AttackOutcome::NoResponse,
+                    detail: "idle connection closed without a response".to_owned(),
+                },
+                Ok(_) => AttackCaseResult {
+                    id: "idle-socket-timeout".to_owned(),
+                    expected: "rejected".to_owned(),
+                    outcome: AttackOutcome::Rejected,
+                    detail: "idle connection received a rejection response".to_owned(),
+                },
+                Err(error)
+                    if matches!(
+                        error.kind(),
+                        io::ErrorKind::TimedOut | io::ErrorKind::WouldBlock
+                    ) =>
+                {
+                    AttackCaseResult {
+                        id: "idle-socket-timeout".to_owned(),
+                        expected: "rejected".to_owned(),
+                        outcome: AttackOutcome::NoResponse,
+                        detail: "idle connection reached the bounded client timeout".to_owned(),
+                    }
+                }
+                Err(_) => AttackCaseResult {
+                    id: "idle-socket-timeout".to_owned(),
+                    expected: "rejected".to_owned(),
+                    outcome: AttackOutcome::TransportError,
+                    detail: "idle connection transport failed".to_owned(),
+                },
+            }
+        }
+        Err(_) => AttackCaseResult {
+            id: "idle-socket-timeout".to_owned(),
+            expected: "rejected".to_owned(),
+            outcome: AttackOutcome::TransportError,
+            detail: "idle connection could not be established".to_owned(),
+        },
+    }
 }
 
 fn send_raw_case(
@@ -887,7 +979,7 @@ mod tests {
         let corpus: RuntimeMutationCorpus =
             generate_runtime_mutation_corpus(&root, &output).expect("corpus");
 
-        assert_eq!(corpus.cases.len(), 6);
+        assert_eq!(corpus.cases.len(), 8);
         assert_eq!(
             fs::read(root.join("agent-runtime.json")).expect("runtime"),
             runtime_before
