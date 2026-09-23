@@ -12,8 +12,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  phase0:
-    name: Phase 0 Foundation
+  validation:
+    name: Phase 1 Core Runner
     runs-on: ubuntu-latest
 
     steps:
@@ -38,11 +38,29 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
-      - name: Phase 0 CLI smoke test
+      - name: Phase 1 CLI and evidence smoke test
         shell: pwsh
         run: |
-          $Output = cargo run -p dfstl-cli -- describe
-          $Output
-          if ($Output -notmatch "phase: 0") { throw "Phase marker missing" }
-          if ($Output -notmatch "default-safety-policy: safe") { throw "Safe-only default missing" }
-          if ($Output -notmatch "active-attack-implementations: none") { throw "Phase 0 safety invariant missing" }
+          $Describe = cargo run -p dfstl-cli -- describe
+          $Describe
+          if ($Describe -notmatch "phase: 1") { throw "Phase marker missing" }
+          if ($Describe -notmatch "default-safety-policy: safe") { throw "Safe-only default missing" }
+
+          $List = cargo run -p dfstl-cli -- list
+          $List
+          if ($List -notmatch "STATIC-RUNNER-001") { throw "Runner self-check missing" }
+          if ($List -notmatch "STATIC-POLICY-001") { throw "Policy self-check missing" }
+
+          cargo run -p dfstl-cli -- run --output ci-results
+          if ($LASTEXITCODE -ne 0) { throw "DFSTL safe run failed" }
+
+          $RunDir = Get-ChildItem ci-results -Directory | Select-Object -First 1
+          if ($null -eq $RunDir) { throw "Evidence run directory missing" }
+          if (-not (Test-Path (Join-Path $RunDir.FullName "report.json"))) { throw "report.json missing" }
+          if (-not (Test-Path (Join-Path $RunDir.FullName "report.txt"))) { throw "report.txt missing" }
+          if (-not (Test-Path (Join-Path $RunDir.FullName "SHA256SUMS"))) { throw "SHA256SUMS missing" }
+
+          $Report = Get-Content (Join-Path $RunDir.FullName "report.json") -Raw | ConvertFrom-Json
+          if ($Report.schema_version -ne 1) { throw "Unexpected report schema" }
+          if ($Report.counts.fail -ne 0) { throw "Target failure recorded" }
+          if ($Report.counts.infrastructure_error -ne 0) { throw "Infrastructure error recorded" }
