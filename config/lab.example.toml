@@ -1,5 +1,5 @@
 # Example DFSTL lab configuration.
-# Phase 0 does not load or execute this file yet.
+# The example remains documentation-only; Phase 2 target selection is explicit via CLI.
 
 [lab]
 name = "dragonforge-disposable-lab"
@@ -9,7 +9,7 @@ allow_disruptive = false
 allow_lab_only = false
 
 [target]
-# Future phases will require an explicit target path.
+# Equivalent to the explicit --target path used by Phase 2.
 dragonforge_root = "C:\\DragonForge-Test-Build"
 
 [evidence]
