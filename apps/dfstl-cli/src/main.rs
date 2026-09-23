@@ -345,7 +345,7 @@ fn source_scan(arguments: &[String]) {
     if report.has_high_findings() || external_failed {
         std::process::exit(1);
     }
-    if external_incomplete {
+    if report.coverage_truncated || external_incomplete {
         std::process::exit(5);
     }
 }
