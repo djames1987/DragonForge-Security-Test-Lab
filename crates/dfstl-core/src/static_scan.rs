@@ -160,7 +160,11 @@ impl StaticScanReport {
             self.counts.warning_findings
         );
         let _ = writeln!(output, "  }},");
-        let _ = writeln!(output, "  \"dependency_count\": {},", self.dependencies.len());
+        let _ = writeln!(
+            output,
+            "  \"dependency_count\": {},",
+            self.dependencies.len()
+        );
         let _ = writeln!(output, "  \"findings\": [");
         for (index, finding) in self.findings.iter().enumerate() {
             let comma = trailing_comma(index, self.findings.len());
@@ -362,7 +366,10 @@ pub fn write_scan_bundle(
 ) -> Result<(), StaticScanError> {
     validate_output_path(output_root)?;
     fs::create_dir_all(output_root)?;
-    fs::write(output_root.join("static-scan.json"), report.to_json_pretty())?;
+    fs::write(
+        output_root.join("static-scan.json"),
+        report.to_json_pretty(),
+    )?;
     fs::write(output_root.join("static-scan.txt"), report.to_text())?;
     fs::write(
         output_root.join("dependency-inventory.json"),
@@ -407,7 +414,13 @@ pub fn run_external_scanners(
         "gitleaks",
         Command::new("gitleaks")
             .current_dir(source_root)
-            .args(["git", "--redact", "--report-format", "json", "--report-path"])
+            .args([
+                "git",
+                "--redact",
+                "--report-format",
+                "json",
+                "--report-path",
+            ])
             .arg(&gitleaks_report),
     );
 
@@ -442,13 +455,7 @@ pub fn dependency_inventory_json(dependencies: &[DependencyRecord]) -> String {
             "      \"version\": \"{}\",",
             json_escape(&dependency.version)
         );
-        write_optional_json(
-            &mut output,
-            "source",
-            dependency.source.as_deref(),
-            true,
-            6,
-        );
+        write_optional_json(&mut output, "source", dependency.source.as_deref(), true, 6);
         write_optional_json(
             &mut output,
             "checksum",
@@ -473,8 +480,7 @@ pub fn spdx_json(dependencies: &[DependencyRecord], source_fingerprint: &str) ->
     let _ = writeln!(output, "  \"name\": \"DFSTL Cargo dependency SBOM\",");
     let _ = writeln!(
         output,
-        "  \"documentNamespace\": \"urn:dfstl:spdx:{}\",",
-        source_fingerprint
+        "  \"documentNamespace\": \"urn:dfstl:spdx:{source_fingerprint}\","
     );
     let _ = writeln!(
         output,
@@ -684,8 +690,7 @@ fn parse_cargo_lock(root: &Path) -> Result<Vec<DependencyRecord>, StaticScanErro
 
     for line in text.lines().chain(std::iter::once("[[package]]")) {
         if line.trim() == "[[package]]" {
-            if let (Some(name), Some(version)) =
-                (current.remove("name"), current.remove("version"))
+            if let (Some(name), Some(version)) = (current.remove("name"), current.remove("version"))
             {
                 dependencies.push(DependencyRecord {
                     name,
@@ -730,11 +735,9 @@ fn contains_aws_access_key(line: &str) -> bool {
 fn is_workflow(path: &Path) -> bool {
     let normalized = normalized_path(path).to_ascii_lowercase();
     normalized.starts_with(".github/workflows/")
-        && Path::new(&normalized)
-            .extension()
-            .is_some_and(|extension| {
-                extension.eq_ignore_ascii_case("yml") || extension.eq_ignore_ascii_case("yaml")
-            })
+        && Path::new(&normalized).extension().is_some_and(|extension| {
+            extension.eq_ignore_ascii_case("yml") || extension.eq_ignore_ascii_case("yaml")
+        })
 }
 
 fn is_full_git_sha(reference: &str) -> bool {
@@ -788,16 +791,8 @@ fn write_tool_json(output: &mut String, key: &str, result: &ExternalToolResult, 
         ExternalToolStatus::Passed | ExternalToolStatus::Unavailable => "null".to_owned(),
     };
     let _ = writeln!(output, "  \"{}\": {{", json_escape(key));
-    let _ = writeln!(
-        output,
-        "    \"tool\": \"{}\",",
-        json_escape(&result.tool)
-    );
-    let _ = writeln!(
-        output,
-        "    \"status\": \"{}\",",
-        result.status.as_str()
-    );
+    let _ = writeln!(output, "    \"tool\": \"{}\",", json_escape(&result.tool));
+    let _ = writeln!(output, "    \"status\": \"{}\",", result.status.as_str());
     let _ = writeln!(output, "    \"exit_code\": {exit_code},");
     let _ = writeln!(
         output,
@@ -932,14 +927,18 @@ mod tests {
         assert!(report.findings.iter().any(|finding| {
             finding.id == "SECRET-GITHUB-PAT" && finding.severity == FindingSeverity::High
         }));
-        assert!(report
-            .findings
-            .iter()
-            .any(|finding| finding.id == "SUPPLY-ACTION-UNPINNED"));
-        assert!(report
-            .findings
-            .iter()
-            .any(|finding| finding.id == "SUPPLY-SELF-HOSTED-RUNNER"));
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| finding.id == "SUPPLY-ACTION-UNPINNED")
+        );
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| finding.id == "SUPPLY-SELF-HOSTED-RUNNER")
+        );
 
         fs::remove_dir_all(root).expect("cleanup");
     }
@@ -955,10 +954,12 @@ mod tests {
         .expect("workflow");
 
         let report = scan_source(&root).expect("scan");
-        assert!(!report
-            .findings
-            .iter()
-            .any(|finding| finding.id == "SUPPLY-ACTION-UNPINNED"));
+        assert!(
+            !report
+                .findings
+                .iter()
+                .any(|finding| finding.id == "SUPPLY-ACTION-UNPINNED")
+        );
 
         fs::remove_dir_all(root).expect("cleanup");
     }
