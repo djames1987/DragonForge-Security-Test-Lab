@@ -8,7 +8,7 @@ Phase 2 gives DFSTL a read-only target-discovery and build-identification layer 
 
 ## Product baseline
 
-Phase 2 is aligned to the current DragonForge Security Suite Windows packaging script on 2026-09-23.
+Phase 2 is aligned to the DragonForge Security Suite Windows packaging script on 2026-09-23 at Security Suite commit `0c551479d9051bede79108d01e3fccb3bc7a4b24`.
 
 The current package contract contains 11 sibling executables:
 
