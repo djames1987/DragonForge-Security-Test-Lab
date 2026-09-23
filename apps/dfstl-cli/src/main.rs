@@ -15,7 +15,10 @@ fn main() {
     match command.as_str() {
         "describe" => describe(),
         "list" => list_tests(),
-        "run" => run_command(args.collect()),
+        "run" => {
+            let arguments: Vec<String> = args.collect();
+            run_command(&arguments);
+        }
         "version" | "--version" | "-V" => {
             println!("dfstl {}", env!("CARGO_PKG_VERSION"));
         }
@@ -78,7 +81,7 @@ fn list_tests() {
     }
 }
 
-fn run_command(arguments: Vec<String>) {
+fn run_command(arguments: &[String]) {
     let mut output = PathBuf::from("results");
     let mut index = 0_usize;
     while index < arguments.len() {
