@@ -13,7 +13,7 @@ env:
 
 jobs:
   validation:
-    name: Phase 3 Static Security
+    name: Phase 4 Encrypted Format Mutation
     runs-on: ubuntu-latest
 
     steps:
@@ -38,57 +38,31 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
-      - name: Phase 3 CLI smoke test
+      - name: Phase 4 CLI smoke test
         shell: pwsh
         run: |
           $Describe = cargo run -p dfstl-cli -- describe
           $Describe
-          if ($Describe -notmatch "phase: 3") { throw "Phase marker missing" }
-          if ($Describe -notmatch "static-source-scan: available") { throw "Static scan capability missing" }
-          if ($Describe -notmatch "spdx-sbom: available") { throw "SBOM capability missing" }
+          if ($Describe -notmatch "phase: 4") { throw "Phase marker missing" }
+          if ($Describe -notmatch "encrypted-format-mutation: available") { throw "Mutation capability missing" }
+          if ($Describe -notmatch "mutation-safety-class: controlled") { throw "Controlled safety marker missing" }
 
           $List = cargo run -p dfstl-cli -- list
           $List
-          if ($List -notmatch "STATIC-SUPPLY-001") { throw "Phase 3 self-check missing" }
+          if ($List -notmatch "PARSER-MUTATE-001") { throw "Phase 4 mutation test missing" }
 
-          $Root = Join-Path $PWD "ci-source"
-          $WorkflowDir = Join-Path $Root ".github/workflows"
-          New-Item -ItemType Directory -Force -Path $WorkflowDir | Out-Null
+          New-Item -ItemType Directory -Force -Path ci-fixtures | Out-Null
+          Set-Content -LiteralPath ci-fixtures/pm.dfvault -NoNewline -Value '{"version":1,"vault_id":"ci","items":[]}'
 
-          @'
-[package]
-name = "ci-fixture"
-version = "0.1.0"
-edition = "2024"
-'@ | Set-Content -LiteralPath (Join-Path $Root "Cargo.toml")
+          cargo run -p dfstl-cli -- format mutate --format password-manager --input ci-fixtures/pm.dfvault --output ci-corpus --controlled --json
+          if ($LASTEXITCODE -ne 0) { throw "Controlled mutation failed" }
 
-          @'
-version = 4
+          $Corpus = Get-Content ci-corpus/corpus.json -Raw | ConvertFrom-Json
+          if ($Corpus.schema_version -ne 1) { throw "Unexpected corpus schema" }
+          if ($Corpus.cases.Count -ne 8) { throw "Unexpected Password Manager mutation count" }
 
-[[package]]
-name = "ci-fixture"
-version = "0.1.0"
-'@ | Set-Content -LiteralPath (Join-Path $Root "Cargo.lock")
-
-          @'
-permissions:
-  contents: read
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@0123456789abcdef0123456789abcdef01234567
-'@ | Set-Content -LiteralPath (Join-Path $WorkflowDir "ci.yml")
-
-          cargo run -p dfstl-cli -- source scan --source $Root --output ci-static --json
-          if ($LASTEXITCODE -ne 0) { throw "Built-in static scan failed" }
-
-          $Report = Get-Content ci-static/static-scan.json -Raw | ConvertFrom-Json
-          if ($Report.schema_version -ne 1) { throw "Unexpected static scan schema" }
-          if ($Report.counts.high_findings -ne 0) { throw "Unexpected high finding" }
-
-          $Sbom = Get-Content ci-static/sbom.spdx.json -Raw | ConvertFrom-Json
-          if ($Sbom.spdxVersion -ne "SPDX-2.3") { throw "Unexpected SBOM version" }
-
-          cargo run -p dfstl-cli -- run --output ci-results
+          cargo run -p dfstl-cli -- run --output ci-safe-results
           if ($LASTEXITCODE -ne 0) { throw "Safe runner regression failed" }
+
+          cargo run -p dfstl-cli -- run --controlled --output ci-controlled-results
+          if ($LASTEXITCODE -ne 0) { throw "Controlled runner regression failed" }
