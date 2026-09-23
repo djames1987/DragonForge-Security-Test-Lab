@@ -30,7 +30,7 @@ impl EncryptedFormat {
     }
 
     #[must_use]
-    pub fn parse(value: &str) -> Option<Self> {
+    pub fn from_name(value: &str) -> Option<Self> {
         match value.to_ascii_lowercase().as_str() {
             "dfvault" | "file-vault" | "dfvault-file-vault" => Some(Self::FileVault),
             "dfbackup" | "backup" => Some(Self::Backup),
@@ -264,7 +264,7 @@ fn validate_seed_path(seed_path: &Path, output_dir: &Path) -> Result<(), Mutatio
 
     let seed_absolute = absolute_lexical(seed_path)?;
     let output_absolute = absolute_lexical(output_dir)?;
-    if seed_absolute == output_absolute || seed_absolute.starts_with(&output_absolute) {
+    if seed_absolute == output_absolute || output_absolute.starts_with(&seed_absolute) {
         return Err(MutationError::OutputInsideInput(output_dir.to_path_buf()));
     }
     Ok(())
@@ -691,7 +691,8 @@ mod tests {
         bytes.extend_from_slice(&1_u16.to_le_bytes());
         bytes.extend_from_slice(&[7_u8; 16]);
         bytes.extend_from_slice(&[9_u8; 12]);
-        bytes.extend_from_slice(&(ciphertext.len() as u64).to_le_bytes());
+        let ciphertext_len = u64::try_from(ciphertext.len()).expect("synthetic length fits u64");
+        bytes.extend_from_slice(&ciphertext_len.to_le_bytes());
         bytes.extend_from_slice(&ciphertext);
         bytes
     }
