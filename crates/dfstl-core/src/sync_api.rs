@@ -627,9 +627,7 @@ fn send_http(
     stream.write_all(body)?;
 
     let mut bytes = Vec::new();
-    stream
-        .take((LIVE_OVERSIZE_BYTES + 128 * 1024) as u64)
-        .read_to_end(&mut bytes)?;
+    stream.take(256 * 1024).read_to_end(&mut bytes)?;
     parse_http_response(&bytes)
 }
 
@@ -847,7 +845,6 @@ mod tests {
         assert!(parse_capture(b"not-http").is_err());
     }
 
-
     #[test]
     fn loopback_probe_exercises_non_state_changing_matrix() {
         let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).expect("listener");
@@ -932,9 +929,11 @@ mod tests {
                     ""
                 };
                 let response = format!(
-                    "HTTP/1.1 {status} {reason}\r\n",
-                    "{extra}Content-Length: 0\r\n",
-                    "Connection: close\r\n\r\n"
+                    concat!(
+                        "HTTP/1.1 {status} {reason}\r\n",
+                        "{extra}Content-Length: 0\r\n",
+                        "Connection: close\r\n\r\n"
+                    )
                 );
                 stream.write_all(response.as_bytes()).expect("response");
             }
@@ -953,10 +952,7 @@ mod tests {
         let source = concat!(
             "PUT /v1/vaults/00000000-0000-0000-0000-000000000001 HTTP/1.1\r\n",
             "Host: 127.0.0.1:8787\r\n",
-            concat!(
-                "Authorization: Bearer ",
-                "1111111111111111111111111111111111111111111111111111111111111111\r\n"
-            ),
+            "Authorization: Bearer 1111111111111111111111111111111111111111111111111111111111111111\r\n",
             "X-DragonForge-Device-Id: 00000000-0000-0000-0000-000000000002\r\n",
             "X-DragonForge-Device-Timestamp: 1000\r\n",
             "X-DragonForge-Device-Signature: aabb\r\n",
