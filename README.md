@@ -6,7 +6,7 @@ DFSTL is intentionally maintained as a separate project from the product it test
 
 ## Project status
 
-**Phase 5 — DragonForge Agent Attack Harness: Implementation Complete — Verification Pending**
+**Phase 5 — DragonForge Agent Attack Harness: Verified Complete**
 
 Phases 0 through 4 are verified complete. Phase 5 adds a Controlled-class black-box Agent attack harness for authenticated loopback IPC, replay/freshness/HMAC/format rejection testing, bounded reconnect and idle-socket behavior, plus cloned runtime/startup-race mutation fixtures.
 
@@ -79,7 +79,7 @@ See [SAFETY.md](SAFETY.md) and [docs/TEST_TAXONOMY.md](docs/TEST_TAXONOMY.md).
 - Phase 2 — DragonForge discovery and build identification: **Verified Complete**
 - Phase 3 — Static, dependency, supply-chain, and secret scanning: **Verified Complete**
 - Phase 4 — Encrypted-format adversarial testing: **Verified Complete**
-- Phase 5 — DragonForge Agent attack harness: **Implementation Complete — Verification Pending**
+- Phase 5 — DragonForge Agent attack harness: **Verified Complete**
 - Phase 6 — Filesystem, reparse-point, and TOCTOU laboratory
 - Phase 7 — Password Manager sync/API attack harness
 - Phase 8 — Fuzzing and security-regression corpus
