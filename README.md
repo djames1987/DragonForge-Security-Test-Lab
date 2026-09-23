@@ -6,7 +6,7 @@ DFSTL is intentionally maintained as a separate project from the product it test
 
 ## Project status
 
-**Phase 4 — Encrypted-Format Adversarial Testing: Implementation Complete — Verification Pending**
+**Phase 4 — Encrypted-Format Adversarial Testing: Verified Complete**
 
 Phases 0 through 3 are verified complete. Phase 4 adds Controlled-class, structure-aware mutation corpora for File Vault, Backup, Secure Share, Authenticator, and Password Manager protected vault formats, with explicit authorization and tamper-evident corpus evidence.
 
@@ -76,7 +76,7 @@ See [SAFETY.md](SAFETY.md) and [docs/TEST_TAXONOMY.md](docs/TEST_TAXONOMY.md).
 - Phase 1 — Core runner, evidence logging, and reporting: **Verified Complete**
 - Phase 2 — DragonForge discovery and build identification: **Verified Complete**
 - Phase 3 — Static, dependency, supply-chain, and secret scanning: **Verified Complete**
-- Phase 4 — Encrypted-format adversarial testing: **Implementation Complete — Verification Pending**
+- Phase 4 — Encrypted-format adversarial testing: **Verified Complete**
 - Phase 5 — DragonForge Agent attack harness
 - Phase 6 — Filesystem, reparse-point, and TOCTOU laboratory
 - Phase 7 — Password Manager sync/API attack harness
