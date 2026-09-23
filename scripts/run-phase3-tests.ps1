@@ -291,8 +291,8 @@ try {
     try {
         $SupplyReport = $Supply.Output | ConvertFrom-Json
         Assert-True "supply fixture has two warnings" ($SupplyReport.counts.warning_findings -eq 2)
-        Assert-True "unpinned Action finding reported" (($SupplyReport.findings | Where-Object { $_.id -eq "SUPPLY-ACTION-UNPINNED" }).Count -eq 1)
-        Assert-True "self-hosted runner finding reported" (($SupplyReport.findings | Where-Object { $_.id -eq "SUPPLY-SELF-HOSTED-RUNNER" }).Count -eq 1)
+        Assert-True "unpinned Action finding reported" (@($SupplyReport.findings | Where-Object { $_.id -eq "SUPPLY-ACTION-UNPINNED" }).Count -eq 1)
+        Assert-True "self-hosted runner finding reported" (@($SupplyReport.findings | Where-Object { $_.id -eq "SUPPLY-SELF-HOSTED-RUNNER" }).Count -eq 1)
     }
     catch {
         $Failures.Add("supply warning JSON validation")
@@ -311,7 +311,7 @@ try {
     try {
         $SecretReport = $Secret.Output | ConvertFrom-Json
         Assert-True "secret fixture has one high finding" ($SecretReport.counts.high_findings -eq 1)
-        Assert-True "GitHub PAT rule reported" (($SecretReport.findings | Where-Object { $_.id -eq "SECRET-GITHUB-PAT" }).Count -eq 1)
+        Assert-True "GitHub PAT rule reported" (@($SecretReport.findings | Where-Object { $_.id -eq "SECRET-GITHUB-PAT" }).Count -eq 1)
     }
     catch {
         $Failures.Add("secret finding JSON validation")
