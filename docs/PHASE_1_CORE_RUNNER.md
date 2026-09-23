@@ -2,7 +2,7 @@
 
 ## Status
 
-**Implementation Complete — Verification Pending**
+**Verified Complete**
 
 Phase 1 turns the Phase 0 foundation into an executable, safety-aware security-test controller.
 
@@ -145,13 +145,32 @@ test-logs\phase1-validation-YYYYMMDD-HHMMSS.log
 test-logs\phase1-validation-YYYYMMDD-HHMMSS.log.sha256
 ```
 
-## Exit criteria
+## Verification record
 
-Phase 1 is verified when the full local validation harness completes with:
+Phase 1 was locally verified on Windows on 2026-09-23 against commit:
 
 ```text
-Warnings: 0
-Failures: 0
+39889a9be2a70a0622d8b5450d896801361e05c0
+```
 
-PHASE 1 VALIDATION: PASS
+The release-mode validation completed with:
+
+- a clean main branch;
+- rustfmt passing;
+- strict Clippy passing with warnings denied;
+- 19 debug tests passing;
+- 19 release tests passing;
+- Phase 1 CLI model checks passing;
+- registered runner/policy self-checks passing;
+- successful evidence finalization with no abandoned staging directory;
+- JSON report parsing and zero target/infrastructure failures;
+- independent SHA-256 verification of all manifest entries;
+- successful release build;
+- zero warnings and zero failures.
+
+Validation evidence:
+
+```text
+phase1-validation-20260923-143217.log
+SHA-256: 7E42F914CB9F314F6476655B798D76AC41729CD3265C0BCBA1A2416CBB7C75BC
 ```
