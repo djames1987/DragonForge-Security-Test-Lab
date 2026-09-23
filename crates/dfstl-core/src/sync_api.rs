@@ -170,6 +170,8 @@ impl RequestMutationCorpus {
     }
 }
 
+type HttpResponse = (u16, Vec<(String, String)>, Vec<u8>);
+
 #[derive(Debug, Clone)]
 struct ParsedRequest {
     request_line: String,
@@ -184,69 +186,64 @@ struct ParsedRequest {
 /// Returns an error when the URL is invalid, non-loopback, or transport setup fails.
 pub fn run_sync_api_probe(base_url: &str) -> Result<SyncApiProbeReport, SyncApiError> {
     let endpoint = parse_loopback_base_url(base_url)?;
-    let mut cases = Vec::new();
-
-    cases.push(probe_health(endpoint)?);
-    cases.push(probe(
-        endpoint,
-        "missing-auth-devices",
-        "GET",
-        "/v1/devices",
-        &[],
-        &[],
-        &[401]
-    )?);
-    cases.push(probe(
-        endpoint,
-        "malformed-bearer-devices",
-        "GET",
-        "/v1/devices",
-        &[("Authorization", "Bearer not-a-valid-token")],
-        &[],
-        &[401]
-    )?);
-    cases.push(probe(
-        endpoint,
-        "bad-admin-provision",
-        "POST",
-        "/v1/accounts",
-        &[("X-DragonForge-Admin-Token", "invalid-admin-token")],
-        &[],
-        &[403]
-    )?);
-    cases.push(probe(
-        endpoint,
-        "unknown-route",
-        "GET",
-        "/v1/does-not-exist",
-        &[],
-        &[],
-        &[404]
-    )?);
-    cases.push(probe(
-        endpoint,
-        "wrong-method-health",
-        "POST",
-        "/v1/health",
-        &[],
-        &[],
-        &[405]
-    )?);
-    cases.push(probe(
-        endpoint,
-        "malformed-recovery-json",
-        "POST",
-        "/v1/recovery/begin",
-        &[("Content-Type", "application/json")],
-        b"{",
-        &[400, 422]
-    )?);
-
-    cases.push(probe_declared_oversize(
-        endpoint,
-        "oversized-request",
-        "/v1/recovery/begin",
-    )?);
+    let cases = vec![
+        probe_health(endpoint)?,
+        probe(
+            endpoint,
+            "missing-auth-devices",
+            "GET",
+            "/v1/devices",
+            &[],
+            &[],
+            &[401],
+        )?,
+        probe(
+            endpoint,
+            "malformed-bearer-devices",
+            "GET",
+            "/v1/devices",
+            &[("Authorization", "Bearer not-a-valid-token")],
+            &[],
+            &[401],
+        )?,
+        probe(
+            endpoint,
+            "bad-admin-provision",
+            "POST",
+            "/v1/accounts",
+            &[("X-DragonForge-Admin-Token", "invalid-admin-token")],
+            &[],
+            &[403],
+        )?,
+        probe(
+            endpoint,
+            "unknown-route",
+            "GET",
+            "/v1/does-not-exist",
+            &[],
+            &[],
+            &[404],
+        )?,
+        probe(
+            endpoint,
+            "wrong-method-health",
+            "POST",
+            "/v1/health",
+            &[],
+            &[],
+            &[405],
+        )?,
+        probe(
+            endpoint,
+            "malformed-recovery-json",
+            "POST",
+            "/v1/recovery/begin",
+            &[("Content-Type", "application/json")],
+            b"{",
+            &[400, 422],
+        )?,
+        probe_declared_oversize(endpoint, "oversized-request", "/v1/recovery/begin")?,
+    ];
 
     Ok(SyncApiProbeReport {
         schema_version: 1,
@@ -600,7 +597,7 @@ fn send_http(
     path: &str,
     headers: &[(&str, &str)],
     body: &[u8],
-) -> Result<(u16, Vec<(String, String)>, Vec<u8>), SyncApiError> {
+) -> Result<HttpResponse, SyncApiError> {
     let mut stream = TcpStream::connect_timeout(&endpoint.into(), CONNECT_TIMEOUT)?;
     stream.set_read_timeout(Some(IO_TIMEOUT))?;
     stream.set_write_timeout(Some(IO_TIMEOUT))?;
@@ -629,9 +626,7 @@ fn send_http(
     parse_http_response(&bytes)
 }
 
-fn parse_http_response(
-    bytes: &[u8],
-) -> Result<(u16, Vec<(String, String)>, Vec<u8>), SyncApiError> {
+fn parse_http_response(bytes: &[u8]) -> Result<HttpResponse, SyncApiError> {
     let split = find_bytes(bytes, b"\r\n\r\n").ok_or(SyncApiError::InvalidCapture)?;
     let head = std::str::from_utf8(&bytes[..split]).map_err(|_| SyncApiError::InvalidCapture)?;
     let mut lines = head.split("\r\n");
