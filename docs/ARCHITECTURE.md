@@ -29,7 +29,7 @@ Test Controller
       +--> VM/Lab Orchestration
 ```
 
-## Phase 0 components
+## Core components
 
 ### `dfstl-core`
 
@@ -41,11 +41,20 @@ Owns foundational data types that future runners must use:
 - `TestDescriptor`;
 - policy decisions for whether a test may execute.
 
-It intentionally does not contain attack implementations.
+Phase 1 extends it with:
+
+- `TestRegistry` and stable-ID validation;
+- `Runner` and central safety-policy enforcement;
+- five-state test results;
+- bounded `EvidenceSession` staging/finalization;
+- internal SHA-256 evidence hashing;
+- JSON and text run reports.
+
+It intentionally does not contain adversarial attack implementations through Phase 1.
 
 ### `dfstl-cli`
 
-A minimal executable used to validate the workspace and expose the Phase 0 model. Future phases will turn it into the primary controller.
+The primary command-line controller. Phase 1 adds `list` and `run` commands, executes registered Safe tests, prints a human-readable summary, and points to the finalized evidence bundle.
 
 ## Trust boundaries
 
