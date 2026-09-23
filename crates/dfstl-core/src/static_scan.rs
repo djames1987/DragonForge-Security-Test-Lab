@@ -220,7 +220,7 @@ impl StaticScanReport {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExternalToolStatus {
     Passed,
     Failed(i32),
@@ -397,14 +397,10 @@ pub fn run_external_scanners(
     let gitleaks_report = output_root.join("gitleaks-history.json");
     let gitleaks = run_tool(
         "gitleaks",
-        Command::new("gitleaks").current_dir(source_root).args([
-            "git",
-            "--redact",
-            "--report-format",
-            "json",
-            "--report-path",
-            &gitleaks_report.to_string_lossy(),
-        ]),
+        Command::new("gitleaks")
+            .current_dir(source_root)
+            .args(["git", "--redact", "--report-format", "json", "--report-path"])
+            .arg(&gitleaks_report),
     );
 
     let results = ExternalScanResults {
@@ -474,7 +470,11 @@ pub fn spdx_json(dependencies: &[DependencyRecord], source_fingerprint: &str) ->
     );
     let _ = writeln!(
         output,
-        "  \"creationInfo\": {{\"creators\": [\"Tool: DragonForge-Security-Test-Lab\"], \"created\": \"1970-01-01T00:00:00Z\"}},"
+        concat!(
+            "  \"creationInfo\": {{\"creators\": ",
+            "[\"Tool: DragonForge-Security-Test-Lab\"], ",
+            "\"created\": \"1970-01-01T00:00:00Z\"}},"
+        )
     );
     let _ = writeln!(output, "  \"packages\": [");
     for (index, dependency) in dependencies.iter().enumerate() {
@@ -634,8 +634,11 @@ fn scan_workflow(path: &Path, text: &str, findings: &mut Vec<StaticFinding>) {
                 severity: FindingSeverity::Warning,
                 path: normalized_path(path),
                 line: Some(line_number),
-                summary: "workflow uses a self-hosted runner; persistent-runner trust must be reviewed"
-                    .to_owned(),
+                summary: concat!(
+                    "workflow uses a self-hosted runner; ",
+                    "persistent-runner trust must be reviewed"
+                )
+                .to_owned(),
             });
         }
 
@@ -673,7 +676,9 @@ fn parse_cargo_lock(root: &Path) -> Result<Vec<DependencyRecord>, StaticScanErro
 
     for line in text.lines().chain(std::iter::once("[[package]]")) {
         if line.trim() == "[[package]]" {
-            if let (Some(name), Some(version)) = (current.remove("name"), current.remove("version")) {
+            if let (Some(name), Some(version)) =
+                (current.remove("name"), current.remove("version"))
+            {
                 dependencies.push(DependencyRecord {
                     name,
                     version,
