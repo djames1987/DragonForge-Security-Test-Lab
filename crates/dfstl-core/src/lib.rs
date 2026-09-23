@@ -8,6 +8,7 @@ pub mod hash;
 pub mod model;
 pub mod runner;
 pub mod static_scan;
+pub mod sync_api;
 pub mod target;
 
 pub use agent_harness::{
@@ -34,6 +35,11 @@ pub use model::{
 pub use runner::{
     Artifact, CompletedRun, RunCounts, RunReport, Runner, SecurityTest, TestContext, TestExecution,
     TestRecord, TestRegistry,
+};
+pub use sync_api::{
+    LIVE_OVERSIZE_BYTES, MAX_CAPTURE_BYTES, RequestMutationCase, RequestMutationCorpus,
+    SYNC_PROTOCOL_VERSION, SyncApiError, SyncApiProbeReport, generate_sync_request_mutations,
+    run_sync_api_probe,
 };
 pub use static_scan::{
     DependencyRecord, ExternalScanResults, ExternalToolResult, ExternalToolStatus, FindingSeverity,
