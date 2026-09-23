@@ -339,8 +339,12 @@ mod tests {
     fn abandoned_staging_directory_is_cleaned_on_drop() {
         let root = temp_root("drop");
         let staging = {
-            let session =
-                EvidenceSession::new(&root, "run-test", EvidenceLimits::default()).expect("session");
+            let session = EvidenceSession::new(
+                &root,
+                "run-test",
+                EvidenceLimits::default(),
+            )
+            .expect("session");
             session.staging_dir().to_path_buf()
         };
         assert!(!staging.exists());
