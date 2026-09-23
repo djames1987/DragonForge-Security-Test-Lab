@@ -131,8 +131,7 @@ impl EvidenceSession {
         let relative_path = relative_path.as_ref();
         validate_relative_path(relative_path)?;
 
-        let byte_count =
-            u64::try_from(bytes.len()).map_err(|_| EvidenceError::ArtifactTooLarge)?;
+        let byte_count = u64::try_from(bytes.len()).map_err(|_| EvidenceError::ArtifactTooLarge)?;
         if byte_count > self.limits.max_file_bytes {
             return Err(EvidenceError::ArtifactTooLarge);
         }
@@ -323,7 +322,9 @@ mod tests {
         let root = temp_root("duplicate");
         let mut session =
             EvidenceSession::new(&root, "run-test", EvidenceLimits::default()).expect("session");
-        session.write_artifact("proof.txt", b"first").expect("first");
+        session
+            .write_artifact("proof.txt", b"first")
+            .expect("first");
         assert!(matches!(
             session.write_artifact("proof.txt", b"second"),
             Err(EvidenceError::ArtifactAlreadyExists)
@@ -358,12 +359,8 @@ mod tests {
     fn abandoned_staging_directory_is_cleaned_on_drop() {
         let root = temp_root("drop");
         let staging = {
-            let session = EvidenceSession::new(
-                &root,
-                "run-test",
-                EvidenceLimits::default(),
-            )
-            .expect("session");
+            let session = EvidenceSession::new(&root, "run-test", EvidenceLimits::default())
+                .expect("session");
             session.staging_dir().to_path_buf()
         };
         assert!(!staging.exists());
