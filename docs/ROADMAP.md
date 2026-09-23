@@ -80,14 +80,17 @@ Delivered:
 
 ## Phase 6 — Filesystem, Reparse-Point, and TOCTOU Lab
 
-Planned:
-- symlinks;
-- junctions/reparse points;
-- hard links;
-- reserved Windows names;
+**Status: Implementation Complete — Verification Pending**
+
+Delivered:
+- deterministic Windows path-policy corpus;
+- symbolic/reparse-link detection and disposable creation attempts;
+- hard-link alias testing;
+- Windows reserved-name coverage;
 - Unicode/path edge cases;
-- source/destination races;
-- restore/extraction containment.
+- source replacement and destination creation races;
+- canonical staging/restore containment checks;
+- LabOnly policy gating and evidence manifests.
 
 ## Phase 7 — Password Manager Sync/API Attack Harness
 
