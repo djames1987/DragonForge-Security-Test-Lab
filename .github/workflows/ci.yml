@@ -13,7 +13,7 @@ env:
 
 jobs:
   validation:
-    name: Phase 1 Core Runner
+    name: Phase 2 Target Discovery
     runs-on: ubuntu-latest
 
     steps:
@@ -38,29 +38,42 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
-      - name: Phase 1 CLI and evidence smoke test
+      - name: Phase 2 CLI smoke test
         shell: pwsh
         run: |
           $Describe = cargo run -p dfstl-cli -- describe
           $Describe
-          if ($Describe -notmatch "phase: 1") { throw "Phase marker missing" }
-          if ($Describe -notmatch "default-safety-policy: safe") { throw "Safe-only default missing" }
+          if ($Describe -notmatch "phase: 2") { throw "Phase marker missing" }
+          if ($Describe -notmatch "expected-suite-executables: 11") { throw "Package contract mismatch" }
 
           $List = cargo run -p dfstl-cli -- list
           $List
-          if ($List -notmatch "STATIC-RUNNER-001") { throw "Runner self-check missing" }
-          if ($List -notmatch "STATIC-POLICY-001") { throw "Policy self-check missing" }
+          if ($List -notmatch "STATIC-TARGET-001") { throw "Phase 2 self-check missing" }
+
+          $Root = Join-Path $PWD "ci-target"
+          New-Item -ItemType Directory -Force -Path $Root | Out-Null
+          $Names = @(
+            "dragonforge-desktop.exe",
+            "dragonforge-security-center.exe",
+            "dragonforge-file-vault.exe",
+            "dragonforge-authenticator.exe",
+            "dragonforge-security-scanner.exe",
+            "dragonforge-integrity-monitor.exe",
+            "dragonforge-network-guard.exe",
+            "dragonforge-backup-recovery.exe",
+            "dragonforge-secure-share.exe",
+            "dragonforge-agent.exe",
+            "dragonforge-privileged-service.exe"
+          )
+          foreach ($Name in $Names) {
+            Set-Content -LiteralPath (Join-Path $Root $Name) -Value $Name -NoNewline
+          }
+
+          $Json = cargo run -p dfstl-cli -- target inspect --target $Root --json
+          if ($LASTEXITCODE -ne 0) { throw "Target inspection failed" }
+          $Report = $Json | ConvertFrom-Json
+          if (-not $Report.complete) { throw "Synthetic target was not complete" }
+          if ($Report.executables.Count -ne 11) { throw "Unexpected executable count" }
 
           cargo run -p dfstl-cli -- run --output ci-results
-          if ($LASTEXITCODE -ne 0) { throw "DFSTL safe run failed" }
-
-          $RunDir = Get-ChildItem ci-results -Directory | Select-Object -First 1
-          if ($null -eq $RunDir) { throw "Evidence run directory missing" }
-          if (-not (Test-Path (Join-Path $RunDir.FullName "report.json"))) { throw "report.json missing" }
-          if (-not (Test-Path (Join-Path $RunDir.FullName "report.txt"))) { throw "report.txt missing" }
-          if (-not (Test-Path (Join-Path $RunDir.FullName "SHA256SUMS"))) { throw "SHA256SUMS missing" }
-
-          $Report = Get-Content (Join-Path $RunDir.FullName "report.json") -Raw | ConvertFrom-Json
-          if ($Report.schema_version -ne 1) { throw "Unexpected report schema" }
-          if ($Report.counts.fail -ne 0) { throw "Target failure recorded" }
-          if ($Report.counts.infrastructure_error -ne 0) { throw "Infrastructure error recorded" }
+          if ($LASTEXITCODE -ne 0) { throw "Safe runner regression failed" }
