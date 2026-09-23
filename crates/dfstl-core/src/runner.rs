@@ -309,7 +309,16 @@ impl Runner {
         for test in registry.iter() {
             let descriptor = test.descriptor();
             let test_started = std::time::Instant::now();
-            let (mut status, mut summary, artifacts) = if !self.policy.allows(descriptor.safety) {
+            let (mut status, mut summary, artifacts) = if self.policy.allows(descriptor.safety) {
+                match test.execute(&context) {
+                    Ok(execution) => (execution.status, execution.summary, execution.artifacts),
+                    Err(error) => (
+                        TestStatus::InfrastructureError,
+                        format!("test execution error: {error}"),
+                        Vec::new(),
+                    ),
+                }
+            } else {
                 (
                     TestStatus::Skipped,
                     format!(
@@ -319,15 +328,6 @@ impl Runner {
                     ),
                     Vec::new(),
                 )
-            } else {
-                match test.execute(&context) {
-                    Ok(execution) => (execution.status, execution.summary, execution.artifacts),
-                    Err(error) => (
-                        TestStatus::InfrastructureError,
-                        format!("test execution error: {error}"),
-                        Vec::new(),
-                    ),
-                }
             };
 
             let mut artifact_count = 0_usize;
@@ -381,10 +381,9 @@ fn validate_test_id(id: &str) -> Result<(), String> {
     if id.len() < 5 || id.len() > 64 {
         return Err(format!("invalid test id length: {id}"));
     }
-    if !id
-        .bytes()
-        .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'_'))
-    {
+    if !id.bytes().all(|byte| {
+        byte.is_ascii_uppercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'_')
+    }) {
         return Err(format!("invalid test id characters: {id}"));
     }
     Ok(())
