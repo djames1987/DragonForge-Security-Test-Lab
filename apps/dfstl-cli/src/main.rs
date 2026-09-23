@@ -4,9 +4,10 @@ use std::env;
 use std::path::PathBuf;
 
 use dfstl_core::{
-    Artifact, EXPECTED_EXECUTABLES, ExecutionModel, ExecutionPolicy, PackageManifestStatus, Runner,
-    SafetyClass, SecurityTest, TargetError, TestCategory, TestContext, TestDescriptor,
-    TestExecution, TestRegistry, inspect_target, resolve_target,
+    Artifact, EXPECTED_EXECUTABLES, ExecutionModel, ExecutionPolicy, ExternalToolStatus,
+    PackageManifestStatus, Runner, SafetyClass, SecurityTest, TargetError, TestCategory,
+    TestContext, TestDescriptor, TestExecution, TestRegistry, inspect_target,
+    run_external_scanners, scan_source, write_scan_bundle, resolve_target,
 };
 
 fn main() {
@@ -24,6 +25,10 @@ fn main() {
             let arguments: Vec<String> = args.collect();
             target_command(&arguments);
         }
+        "source" => {
+            let arguments: Vec<String> = args.collect();
+            source_command(&arguments);
+        }
         "version" | "--version" | "-V" => {
             println!("dfstl {}", env!("CARGO_PKG_VERSION"));
         }
@@ -39,7 +44,7 @@ fn main() {
 fn describe() {
     let policy = ExecutionPolicy::default();
     println!("DragonForge Security Test Lab");
-    println!("phase: 2");
+    println!("phase: 3");
     println!("default-safety-policy: {}", policy.maximum_class());
     println!(
         "controlled-allowed-by-default: {}",
@@ -60,6 +65,10 @@ fn describe() {
     println!("target-discovery: available");
     println!("target-build-identification: sha256");
     println!("expected-suite-executables: {}", EXPECTED_EXECUTABLES.len());
+    println!("static-source-scan: available");
+    println!("dependency-inventory: available");
+    println!("spdx-sbom: available");
+    println!("external-scanners: cargo-audit,cargo-deny,gitleaks");
     println!("active-attack-implementations: none");
 }
 
@@ -73,6 +82,9 @@ fn registry() -> TestRegistry {
         .expect("static built-in test ID must be valid");
     registry
         .register(TargetDiscoverySelfCheck)
+        .expect("static built-in test ID must be valid");
+    registry
+        .register(StaticScanSelfCheck)
         .expect("static built-in test ID must be valid");
     registry
 }
@@ -221,17 +233,136 @@ fn target_inspect(arguments: &[String]) {
     }
 }
 
+fn source_command(arguments: &[String]) {
+    let Some(subcommand) = arguments.first() else {
+        eprintln!("source requires a subcommand: scan");
+        std::process::exit(2);
+    };
+
+    match subcommand.as_str() {
+        "scan" => source_scan(&arguments[1..]),
+        other => {
+            eprintln!("unknown source subcommand: {other}");
+            std::process::exit(2);
+        }
+    }
+}
+
+fn source_scan(arguments: &[String]) {
+    let mut source = None;
+    let mut output = PathBuf::from("results/static-scan");
+    let mut external = false;
+    let mut json = false;
+    let mut index = 0_usize;
+
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--source" => {
+                index += 1;
+                let Some(path) = arguments.get(index) else {
+                    eprintln!("--source requires a path");
+                    std::process::exit(2);
+                };
+                source = Some(PathBuf::from(path));
+            }
+            "--output" => {
+                index += 1;
+                let Some(path) = arguments.get(index) else {
+                    eprintln!("--output requires a path");
+                    std::process::exit(2);
+                };
+                output = PathBuf::from(path);
+            }
+            "--external" => external = true,
+            "--json" => json = true,
+            unknown => {
+                eprintln!("unknown source scan option: {unknown}");
+                std::process::exit(2);
+            }
+        }
+        index += 1;
+    }
+
+    let Some(source) = source else {
+        eprintln!("source scan requires --source PATH");
+        std::process::exit(2);
+    };
+
+    let report = match scan_source(&source) {
+        Ok(report) => report,
+        Err(error) => {
+            eprintln!("source scan failed: {error}");
+            std::process::exit(3);
+        }
+    };
+
+    if let Err(error) = write_scan_bundle(&output, &report) {
+        eprintln!("failed to write source-scan evidence: {error}");
+        std::process::exit(3);
+    }
+
+    if json {
+        print!("{}", report.to_json_pretty());
+    } else {
+        print!("{}", report.to_text());
+        println!("Evidence directory: {}", output.display());
+    }
+
+    let mut external_incomplete = false;
+    let mut external_failed = false;
+    if external {
+        let external_dir = output.join("external");
+        let results = match run_external_scanners(&source, &external_dir) {
+            Ok(results) => results,
+            Err(error) => {
+                eprintln!("external scanner orchestration failed: {error}");
+                std::process::exit(3);
+            }
+        };
+
+        for result in [
+            &results.cargo_audit,
+            &results.cargo_deny,
+            &results.gitleaks_history,
+        ] {
+            match result.status {
+                ExternalToolStatus::Passed => {}
+                ExternalToolStatus::Unavailable => external_incomplete = true,
+                ExternalToolStatus::Failed(_) => external_failed = true,
+            }
+        }
+
+        if !json {
+            println!(
+                "External scanners: cargo-audit={}, cargo-deny={}, gitleaks={}",
+                results.cargo_audit.status.as_str(),
+                results.cargo_deny.status.as_str(),
+                results.gitleaks_history.status.as_str()
+            );
+        }
+    }
+
+    if report.has_high_findings() || external_failed {
+        std::process::exit(1);
+    }
+    if external_incomplete {
+        std::process::exit(5);
+    }
+}
+
 fn help() {
     println!("DragonForge Security Test Lab");
     println!();
     println!("Usage: dfstl <command>");
     println!();
     println!("Commands:");
-    println!("  describe                         Show the Phase 2 runtime model");
+    println!("  describe                         Show the Phase 3 runtime model");
     println!("  list                             List registered built-in tests");
     println!("  run [--output PATH]              Run safe registered tests and write evidence");
     println!("  target inspect --target PATH     Identify an explicit local DragonForge build");
-    println!("  version              Show the CLI version");
+    println!("  source scan --source PATH        Run built-in static/dependency/secret scans");
+    println!("    [--output PATH] [--json] [--external]");
+    println!("  version                          Show the CLI version");
     println!("  help                 Show this help");
 }
 
@@ -320,6 +451,27 @@ impl SecurityTest for TargetDiscoverySelfCheck {
 
         Ok(TestExecution::pass(
             "target discovery contract tracks 11 current suite executables",
+        ))
+    }
+}
+
+struct StaticScanSelfCheck;
+
+impl SecurityTest for StaticScanSelfCheck {
+    fn descriptor(&self) -> &TestDescriptor {
+        static DESCRIPTOR: TestDescriptor = TestDescriptor::new(
+            "STATIC-SUPPLY-001",
+            "Static scanner capability contract",
+            TestCategory::SupplyChain,
+            SafetyClass::Safe,
+            ExecutionModel::WhiteBox,
+        );
+        &DESCRIPTOR
+    }
+
+    fn execute(&self, _context: &TestContext<'_>) -> Result<TestExecution, String> {
+        Ok(TestExecution::pass(
+            "built-in static, dependency, SBOM, supply-chain, and secret scanning is available",
         ))
     }
 }
