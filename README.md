@@ -8,9 +8,9 @@ DFSTL is intentionally maintained as a separate project from the product it test
 
 **Phase 1 — Core Runner, Evidence Logging, and Reporting: Implementation Complete — Verification Pending**
 
-Phase 0 establishes the repository, security boundaries, safety classes, threat model, test taxonomy, roadmap, and a minimal Rust workspace that future phases will extend into the executable test controller.
+Phase 0 is verified complete. Phase 1 adds the executable test registry and runner, bounded evidence staging/finalization, structured JSON and human-readable reports, SHA-256 evidence manifests, and Safe-only built-in validation tests.
 
-No destructive security tests are implemented in Phase 0.
+No destructive security tests are implemented through Phase 1.
 
 ## Design principles
 
@@ -31,14 +31,16 @@ No destructive security tests are implemented in Phase 0.
 ```text
 DragonForge-Security-Test-Lab/
 ├── apps/
-│   └── dfstl-cli/          # Future test-controller CLI
+│   └── dfstl-cli/          # Primary test-controller CLI
 ├── crates/
-│   └── dfstl-core/         # Shared models, safety classes, and test metadata
+│   └── dfstl-core/         # Runner, safety, evidence, hashing, and reports
 ├── config/
 │   └── lab.example.toml    # Example lab-only configuration
 ├── docs/
 │   ├── ARCHITECTURE.md
 │   ├── PHASE_0_FOUNDATION.md
+│   ├── PHASE_1_CORE_RUNNER.md
+│   ├── REPORT_SCHEMA.md
 │   ├── ROADMAP.md
 │   ├── TEST_TAXONOMY.md
 │   └── THREAT_MODEL.md
@@ -140,6 +142,8 @@ cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 cargo run -p dfstl-cli -- describe
+cargo run -p dfstl-cli -- list
+cargo run -p dfstl-cli -- run --output .\results
 ```
 
 ## Important
