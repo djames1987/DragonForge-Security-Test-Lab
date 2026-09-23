@@ -6,11 +6,11 @@ DFSTL is intentionally maintained as a separate project from the product it test
 
 ## Project status
 
-**Phase 4 — Encrypted-Format Adversarial Testing: Verified Complete**
+**Phase 5 — DragonForge Agent Attack Harness: Implementation Complete — Verification Pending**
 
-Phases 0 through 3 are verified complete. Phase 4 adds Controlled-class, structure-aware mutation corpora for File Vault, Backup, Secure Share, Authenticator, and Password Manager protected vault formats, with explicit authorization and tamper-evident corpus evidence.
+Phases 0 through 4 are verified complete. Phase 5 adds a Controlled-class black-box Agent attack harness for authenticated loopback IPC, replay/freshness/HMAC/format rejection testing, bounded reconnect and idle-socket behavior, plus cloned runtime/startup-race mutation fixtures.
 
-Phase 4 introduces Controlled adversarial input generation, but no Disruptive or LabOnly tests are implemented.
+Phase 5 extends Controlled adversarial testing to the local Agent IPC boundary. No Disruptive or LabOnly tests are implemented.
 
 ## Design principles
 
@@ -43,6 +43,8 @@ DragonForge-Security-Test-Lab/
 │   ├── PHASE_2_TARGET_DISCOVERY.md
 │   ├── PHASE_3_STATIC_SUPPLY_CHAIN.md
 │   ├── PHASE_4_ENCRYPTED_FORMATS.md
+│   ├── PHASE_5_AGENT_HARNESS.md
+│   ├── AGENT_ATTACK_SCHEMA.md
 │   ├── ENCRYPTED_MUTATION_SCHEMA.md
 │   ├── REPORT_SCHEMA.md
 │   ├── STATIC_SCAN_SCHEMA.md
@@ -77,7 +79,7 @@ See [SAFETY.md](SAFETY.md) and [docs/TEST_TAXONOMY.md](docs/TEST_TAXONOMY.md).
 - Phase 2 — DragonForge discovery and build identification: **Verified Complete**
 - Phase 3 — Static, dependency, supply-chain, and secret scanning: **Verified Complete**
 - Phase 4 — Encrypted-format adversarial testing: **Verified Complete**
-- Phase 5 — DragonForge Agent attack harness
+- Phase 5 — DragonForge Agent attack harness: **Implementation Complete — Verification Pending**
 - Phase 6 — Filesystem, reparse-point, and TOCTOU laboratory
 - Phase 7 — Password Manager sync/API attack harness
 - Phase 8 — Fuzzing and security-regression corpus
@@ -111,6 +113,25 @@ cargo run -p dfstl-cli -- target inspect --target C:\DragonForge-Test-Build --js
 DFSTL reads and hashes the explicit target; it does not execute DragonForge binaries. The current Windows package contract contains 11 expected executables.
 
 See [docs/PHASE_2_TARGET_DISCOVERY.md](docs/PHASE_2_TARGET_DISCOVERY.md) and [docs/TARGET_IDENTIFICATION_SCHEMA.md](docs/TARGET_IDENTIFICATION_SCHEMA.md).
+
+## Phase 5 Agent attack harness
+
+```powershell
+cargo run -p dfstl-cli -- agent attack --runtime-dir C:\Path\To\AgentRuntime --controlled
+cargo run -p dfstl-cli -- agent runtime-mutate --runtime-dir C:\Path\To\AgentRuntime --output .\results\agent-runtime-corpus --controlled
+```
+
+The live harness is restricted to the explicit DragonForge Agent runtime descriptor and IPv4 loopback. Runtime-file mutation uses cloned fixtures and never overwrites the live runtime files.
+
+See [docs/PHASE_5_AGENT_HARNESS.md](docs/PHASE_5_AGENT_HARNESS.md) and [docs/AGENT_ATTACK_SCHEMA.md](docs/AGENT_ATTACK_SCHEMA.md).
+
+## Local Phase 5 validation
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-phase5-tests.ps1 -Release
+```
+
+The deterministic validator uses synthetic runtime files and an in-process loopback mock Agent; it does not require or alter a live DragonForge Agent.
 
 ## Phase 4 encrypted-format mutation
 
