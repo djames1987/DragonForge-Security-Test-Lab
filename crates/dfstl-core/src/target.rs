@@ -327,7 +327,7 @@ impl TargetInspection {
     }
 }
 
-/// Returns immediate child directories that look like DragonForge build roots.
+/// Returns immediate child directories that look like `DragonForge` build roots.
 ///
 /// # Errors
 ///
@@ -351,7 +351,7 @@ pub fn discover_candidates(root: &Path) -> Result<Vec<PathBuf>, TargetError> {
     Ok(candidates)
 }
 
-/// Resolves an exact DragonForge target or exactly one immediate child target.
+/// Resolves an exact `DragonForge` target or exactly one immediate child target.
 ///
 /// # Errors
 ///
@@ -371,7 +371,7 @@ pub fn resolve_target(root: &Path) -> Result<PathBuf, TargetError> {
     }
 }
 
-/// Inspects a resolved DragonForge target without executing target binaries.
+/// Inspects a resolved `DragonForge` target without executing target binaries.
 ///
 /// # Errors
 ///
@@ -385,12 +385,14 @@ pub fn inspect_target(root: &Path) -> Result<TargetInspection, TargetError> {
 
     for name in EXPECTED_EXECUTABLES {
         let path = root.join(name);
-        if !path.exists() {
-            missing_executables.push(name.to_owned());
-            continue;
-        }
-
-        let metadata = fs::symlink_metadata(&path)?;
+        let metadata = match fs::symlink_metadata(&path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                missing_executables.push(name.to_owned());
+                continue;
+            }
+            Err(error) => return Err(error.into()),
+        };
         if metadata.file_type().is_symlink() {
             return Err(TargetError::ExpectedFileIsSymlink(path));
         }
@@ -480,11 +482,11 @@ fn unexpected_executables(root: &Path) -> Result<Vec<String>, TargetError> {
 
 fn read_build_info(root: &Path) -> Result<Option<BuildInfo>, TargetError> {
     let path = root.join("BUILD-INFO.txt");
-    if !path.exists() {
-        return Ok(None);
-    }
-
-    let metadata = fs::symlink_metadata(&path)?;
+    let metadata = match fs::symlink_metadata(&path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error.into()),
+    };
     if metadata.file_type().is_symlink() {
         return Err(TargetError::ExpectedFileIsSymlink(path));
     }
@@ -501,11 +503,13 @@ fn validate_package_manifest(
     executables: &[TargetExecutable],
 ) -> Result<PackageManifestStatus, TargetError> {
     let path = root.join("SHA256SUMS.txt");
-    if !path.exists() {
-        return Ok(PackageManifestStatus::Absent);
-    }
-
-    let metadata = fs::symlink_metadata(&path)?;
+    let metadata = match fs::symlink_metadata(&path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            return Ok(PackageManifestStatus::Absent);
+        }
+        Err(error) => return Err(error.into()),
+    };
     if metadata.file_type().is_symlink() {
         return Err(TargetError::ExpectedFileIsSymlink(path));
     }
@@ -651,7 +655,16 @@ mod tests {
 
         fs::write(
             root.join("BUILD-INFO.txt"),
-            "DragonForge Security Suite\nVersion: v9.9.9-test\nRelease channel: test\nGit commit: 0123456789abcdef\nGit tag: v9.9.9-test\nBuilt (UTC): 2026-09-23T00:00:00Z\nPlatform: Windows x64 portable\nCode signing: synthetic\n",
+            concat!(
+                "DragonForge Security Suite\n",
+                "Version: v9.9.9-test\n",
+                "Release channel: test\n",
+                "Git commit: 0123456789abcdef\n",
+                "Git tag: v9.9.9-test\n",
+                "Built (UTC): 2026-09-23T00:00:00Z\n",
+                "Platform: Windows x64 portable\n",
+                "Code signing: synthetic\n",
+            ),
         )
         .expect("write build info");
 
