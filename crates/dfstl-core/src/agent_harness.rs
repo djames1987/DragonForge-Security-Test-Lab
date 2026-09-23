@@ -222,7 +222,11 @@ impl RuntimeMutationCorpus {
         let _ = writeln!(output, "  \"schema_version\": {},", self.schema_version);
         let _ = writeln!(output, "  \"cases\": [");
         for (index, case) in self.cases.iter().enumerate() {
-            let comma = if index + 1 == self.cases.len() { "" } else { "," };
+            let comma = if index + 1 == self.cases.len() {
+                ""
+            } else {
+                ","
+            };
             let _ = writeln!(
                 output,
                 "    {{\"id\":\"{}\",\"path\":\"{}\",\"sha256\":\"{}\"}}{comma}",
@@ -283,26 +287,29 @@ pub fn run_agent_attack_harness(
     })
 }
 
-
 fn build_attack_cases(address: SocketAddrV4, key: &[u8]) -> Vec<AttackCaseResult> {
-    let now = now_ms();
-    let mut cases = Vec::new();
+    let mut cases = transport_attack_cases(address);
+    cases.extend(authenticated_attack_cases(address, key));
+    cases
+}
 
-    cases.push(send_raw_case(
-        address,
-        "malformed-json",
-        "rejected",
-        b"{not-json}\n",
-    ));
-
+fn transport_attack_cases(address: SocketAddrV4) -> Vec<AttackCaseResult> {
     let oversized = vec![b'A'; MAX_WIRE_BYTES];
-    cases.push(send_raw_case(
-        address,
-        "oversized-message",
-        "rejected",
-        &oversized,
-    ));
-    cases.push(send_idle_case(address));
+    let mut cases = vec![
+        send_raw_case(
+            address,
+            "malformed-json",
+            "rejected",
+            b"{not-json}\n",
+        ),
+        send_raw_case(
+            address,
+            "oversized-message",
+            "rejected",
+            &oversized,
+        ),
+        send_idle_case(address),
+    ];
 
     let invalid_tag = "00".repeat(32);
     let reconnect_failures = (0_u8..8)
@@ -322,6 +329,7 @@ fn build_attack_cases(address: SocketAddrV4, key: &[u8]) -> Vec<AttackCaseResult
         })
         .filter(|result| matches!(result.outcome, AttackOutcome::TransportError))
         .count();
+
     cases.push(AttackCaseResult {
         id: "bounded-reconnect-stress".to_owned(),
         expected: "accepted".to_owned(),
@@ -332,88 +340,61 @@ fn build_attack_cases(address: SocketAddrV4, key: &[u8]) -> Vec<AttackCaseResult
         },
         detail: format!("8 sequential reconnect probes; transport_failures={reconnect_failures}"),
     });
+    cases
+}
 
+fn authenticated_attack_cases(address: SocketAddrV4, key: &[u8]) -> Vec<AttackCaseResult> {
+    let now = now_ms();
+    let invalid_tag = "00".repeat(32);
     let unsigned = RequestSpec::new(1001, now, deterministic_nonce(1));
-    cases.push(send_request_case(
-        address,
-        "invalid-hmac",
-        "rejected",
-        &unsigned,
-        &invalid_tag,
-    ));
 
     let mut wrong_source = RequestSpec::new(1002, now, deterministic_nonce(2));
     "security-scanner".clone_into(&mut wrong_source.source);
-    cases.push(send_signed_case(
-        address,
-        "wrong-source",
-        "rejected",
-        &wrong_source,
-        key,
-    ));
 
     let mut wrong_protocol = RequestSpec::new(1003, now, deterministic_nonce(3));
     wrong_protocol.protocol_major = AGENT_PROTOCOL_MAJOR.saturating_add(1);
-    cases.push(send_signed_case(
-        address,
-        "wrong-protocol-major",
-        "rejected",
-        &wrong_protocol,
-        key,
-    ));
 
     let stale = RequestSpec::new(
         1004,
         now.saturating_sub(MAX_CLOCK_SKEW_MS.saturating_add(1)),
         deterministic_nonce(4),
     );
-    cases.push(send_signed_case(
-        address,
-        "stale-timestamp",
-        "rejected",
-        &stale,
-        key,
-    ));
-
     let future = RequestSpec::new(
         1005,
         now.saturating_add(MAX_CLOCK_SKEW_MS.saturating_add(1)),
         deterministic_nonce(5),
     );
-    cases.push(send_signed_case(
-        address,
-        "future-timestamp",
-        "rejected",
-        &future,
-        key,
-    ));
-
     let invalid_nonce = RequestSpec::new(1006, now, "AA==".to_owned());
-    cases.push(send_signed_case(
-        address,
-        "invalid-nonce-length",
-        "rejected",
-        &invalid_nonce,
-        key,
-    ));
-
     let valid = RequestSpec::new(1007, now_ms(), deterministic_nonce(7));
-    cases.push(send_signed_case(
-        address,
-        "valid-health",
-        "accepted",
-        &valid,
-        key,
-    ));
-    cases.push(send_signed_case(
-        address,
-        "replayed-nonce",
-        "rejected",
-        &valid,
-        key,
-    ));
 
-    cases
+    vec![
+        send_request_case(
+            address,
+            "invalid-hmac",
+            "rejected",
+            &unsigned,
+            &invalid_tag,
+        ),
+        send_signed_case(address, "wrong-source", "rejected", &wrong_source, key),
+        send_signed_case(
+            address,
+            "wrong-protocol-major",
+            "rejected",
+            &wrong_protocol,
+            key,
+        ),
+        send_signed_case(address, "stale-timestamp", "rejected", &stale, key),
+        send_signed_case(address, "future-timestamp", "rejected", &future, key),
+        send_signed_case(
+            address,
+            "invalid-nonce-length",
+            "rejected",
+            &invalid_nonce,
+            key,
+        ),
+        send_signed_case(address, "valid-health", "accepted", &valid, key),
+        send_signed_case(address, "replayed-nonce", "rejected", &valid, key),
+    ]
 }
 
 /// Generates a disposable runtime-file mutation corpus without changing the live
