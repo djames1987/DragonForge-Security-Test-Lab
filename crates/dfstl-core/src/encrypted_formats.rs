@@ -543,10 +543,7 @@ fn password_manager_cases(seed: &[u8]) -> Result<Vec<(String, String, Vec<u8>)>,
     }
 
     let mut first_byte_tamper = seed.to_vec();
-    if let Some(index) = first_byte_tamper
-        .iter()
-        .position(u8::is_ascii_alphanumeric)
-    {
+    if let Some(index) = first_byte_tamper.iter().position(u8::is_ascii_alphanumeric) {
         first_byte_tamper[index] ^= 0x01;
     }
     cases.push((
@@ -728,8 +725,18 @@ mod tests {
             generate_mutation_corpus(&seed, EncryptedFormat::FileVault, &output).expect("corpus");
 
         assert!(corpus.cases.len() >= 18);
-        assert!(corpus.cases.iter().any(|case| case.id == "argon-memory-max"));
-        assert!(corpus.cases.iter().any(|case| case.id == "ciphertext-bitflip"));
+        assert!(
+            corpus
+                .cases
+                .iter()
+                .any(|case| case.id == "argon-memory-max")
+        );
+        assert!(
+            corpus
+                .cases
+                .iter()
+                .any(|case| case.id == "ciphertext-bitflip")
+        );
         assert!(output.join("SHA256SUMS").is_file());
 
         fs::remove_file(seed).expect("cleanup seed");
@@ -740,9 +747,7 @@ mod tests {
     fn authenticator_profile_rejects_wrong_magic() {
         let seed = write_seed("wrong-auth", &argon_seed(*b"DFV1"));
         let output = temp_path("wrong-auth-out");
-        assert!(
-            generate_mutation_corpus(&seed, EncryptedFormat::Authenticator, &output).is_err()
-        );
+        assert!(generate_mutation_corpus(&seed, EncryptedFormat::Authenticator, &output).is_err());
         fs::remove_file(seed).expect("cleanup");
     }
 
@@ -753,7 +758,12 @@ mod tests {
         let corpus =
             generate_mutation_corpus(&seed, EncryptedFormat::Backup, &output).expect("corpus");
 
-        assert!(corpus.cases.iter().any(|case| case.id == "cipher-length-max"));
+        assert!(
+            corpus
+                .cases
+                .iter()
+                .any(|case| case.id == "cipher-length-max")
+        );
         assert!(
             corpus
                 .cases
@@ -779,17 +789,11 @@ mod tests {
 
     #[test]
     fn password_manager_profile_mutates_json_version() {
-        let seed = write_seed(
-            "pm",
-            br#"{"version":1,"vault_id":"synthetic","items":[]}"#,
-        );
+        let seed = write_seed("pm", br#"{"version":1,"vault_id":"synthetic","items":[]}"#);
         let output = temp_path("pm-out");
-        let corpus = generate_mutation_corpus(
-            &seed,
-            EncryptedFormat::PasswordManagerVault,
-            &output,
-        )
-        .expect("corpus");
+        let corpus =
+            generate_mutation_corpus(&seed, EncryptedFormat::PasswordManagerVault, &output)
+                .expect("corpus");
 
         assert!(corpus.cases.iter().any(|case| case.id == "zero-version"));
         assert!(corpus.cases.iter().any(|case| case.id == "future-version"));
