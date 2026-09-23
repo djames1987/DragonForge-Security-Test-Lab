@@ -2,7 +2,7 @@
 
 ## Status
 
-**Implementation Complete — Verification Pending**
+**Verified Complete**
 
 Phase 2 gives DFSTL a read-only target-discovery and build-identification layer before adversarial product testing begins.
 
@@ -155,13 +155,38 @@ The validator checks:
 
 The validation harness uses disposable synthetic executables only and writes its fixtures beneath ignored `results/`.
 
-## Exit criteria
+## Verification record
 
-Phase 2 is verified when the release-mode validation ends with:
+Phase 2 was locally verified on Windows on 2026-09-23 against commit:
 
 ```text
-Warnings: 0
-Failures: 0
+533fbb346fa6a3e7536698f3a40cd3754bab06bd
+```
 
-PHASE 2 VALIDATION: PASS
+The release-mode validation completed with:
+
+- a clean `main` branch;
+- rustfmt passing;
+- strict Clippy passing with warnings denied;
+- 26 debug tests passing;
+- 26 release tests passing;
+- Phase 2 CLI model checks passing;
+- the 11-executable target contract confirmed;
+- complete synthetic target identification passing;
+- target JSON schema version 1 confirmed;
+- BUILD-INFO version and commit metadata parsing passing;
+- package checksum-manifest validation passing;
+- independent PowerShell SHA-256 comparison for the Agent passing;
+- single-child target resolution passing;
+- incomplete-package detection for a missing Agent passing;
+- fail-closed ambiguous-target selection passing;
+- all three Safe runner self-checks passing;
+- release build succeeding;
+- zero warnings and zero failures.
+
+Validation evidence:
+
+```text
+phase2-validation-20260923-145820.log
+SHA-256: 43CEAE707588C590C02175E5ADF8026FBE537E828BDCE6A841FBA671A4C6D8A7
 ```
