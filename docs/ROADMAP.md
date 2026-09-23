@@ -30,7 +30,9 @@ Delivered:
 
 ## Phase 2 — DragonForge Discovery and Build Identification
 
-Planned:
+**Status: Implementation Complete — Verification Pending**
+
+Delivered:
 - discover explicit local DragonForge builds;
 - record executable hashes;
 - identify version/commit metadata when present;
