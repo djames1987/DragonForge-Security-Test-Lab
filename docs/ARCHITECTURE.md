@@ -48,7 +48,9 @@ Phase 1 extends it with:
 - five-state test results;
 - bounded `EvidenceSession` staging/finalization;
 - internal SHA-256 evidence hashing;
-- JSON and text run reports.
+- JSON and text run reports;
+- explicit local target discovery and build identification;
+- package completeness and checksum-manifest validation.
 
 It intentionally does not contain adversarial attack implementations through Phase 1.
 
@@ -98,7 +100,7 @@ A test report must record which model was used.
 1. Unknown safety state fails closed.
 2. Default policy permits Safe tests only.
 3. A higher-risk test cannot silently downgrade its metadata.
-4. Target paths/endpoints must be explicit before active testing.
+4. Target paths/endpoints must be explicit before active testing; ambiguous target discovery fails closed.
 5. Evidence must not intentionally contain real secrets.
 6. Every test has a stable identifier.
 7. A failed tester/infrastructure action is not reported as a target vulnerability.
