@@ -278,6 +278,12 @@ pub fn validate_windows_relative_path(value: &str) -> Result<(), String> {
     if value.contains(':') {
         return Err("drive or alternate-stream colon".to_owned());
     }
+    if value
+        .split('/')
+        .any(|segment| matches!(segment, "." | ".."))
+    {
+        return Err("dot traversal component".to_owned());
+    }
 
     let path = Path::new(value);
     if path.is_absolute() {
@@ -548,7 +554,8 @@ fn source_replacement_case(root: &Path) -> Result<LabCase, FilesystemLabError> {
 
 #[cfg(windows)]
 fn platform_reparse_cases(root: &Path) -> Result<Vec<LabCase>, FilesystemLabError> {
-    use std::os::windows::fs::{symlink_dir, symlink_file};
+    use std::os::windows::fs::{MetadataExt, symlink_dir, symlink_file};
+    use std::process::Command;
 
     let dir = root.join("reparse");
     fs::create_dir_all(&dir)?;
@@ -559,6 +566,7 @@ fn platform_reparse_cases(root: &Path) -> Result<Vec<LabCase>, FilesystemLabErro
 
     let dir_link = dir.join("dir-link");
     let file_link = dir.join("file-link.txt");
+    let junction = dir.join("junction-link");
 
     let directory_case = match symlink_dir(&target_dir, &dir_link) {
         Ok(()) => {
@@ -578,6 +586,43 @@ fn platform_reparse_cases(root: &Path) -> Result<Vec<LabCase>, FilesystemLabErro
             id: "directory-reparse-link".to_owned(),
             status: LabCaseStatus::Skipped,
             detail: format!("directory reparse creation unavailable: {error}"),
+        },
+    };
+
+    let junction_case = match Command::new("cmd.exe")
+        .args(["/D", "/C", "mklink", "/J"])
+        .arg(&junction)
+        .arg(&target_dir)
+        .output()
+    {
+        Ok(output) if output.status.success() => {
+            const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+            let meta = fs::symlink_metadata(&junction)?;
+            let is_reparse =
+                meta.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0;
+            LabCase {
+                id: "directory-junction-reparse".to_owned(),
+                status: if is_reparse {
+                    LabCaseStatus::Pass
+                } else {
+                    LabCaseStatus::Fail
+                },
+                detail: "directory junction was created and carries the Windows reparse attribute"
+                    .to_owned(),
+            }
+        }
+        Ok(output) => LabCase {
+            id: "directory-junction-reparse".to_owned(),
+            status: LabCaseStatus::Skipped,
+            detail: format!(
+                "junction creation unavailable: exit status {}",
+                output.status
+            ),
+        },
+        Err(error) => LabCase {
+            id: "directory-junction-reparse".to_owned(),
+            status: LabCaseStatus::Skipped,
+            detail: format!("junction creation unavailable: {error}"),
         },
     };
 
@@ -602,7 +647,7 @@ fn platform_reparse_cases(root: &Path) -> Result<Vec<LabCase>, FilesystemLabErro
         },
     };
 
-    Ok(vec![directory_case, file_case])
+    Ok(vec![directory_case, junction_case, file_case])
 }
 
 #[cfg(not(windows))]
