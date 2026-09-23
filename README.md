@@ -6,7 +6,7 @@ DFSTL is intentionally maintained as a separate project from the product it test
 
 ## Project status
 
-**Phase 2 — DragonForge Discovery and Build Identification: Implementation Complete — Verification Pending**
+**Phase 2 — DragonForge Discovery and Build Identification: Verified Complete**
 
 Phases 0 and 1 are verified complete. Phase 2 adds explicit local DragonForge target selection, package completeness checks, per-executable SHA-256 identification, BUILD-INFO parsing, checksum-manifest validation, deterministic build fingerprints, and fail-closed ambiguity handling.
 
@@ -70,7 +70,7 @@ See [SAFETY.md](SAFETY.md) and [docs/TEST_TAXONOMY.md](docs/TEST_TAXONOMY.md).
 
 - Phase 0 — Architecture, safety model, and test taxonomy: **Verified Complete**
 - Phase 1 — Core runner, evidence logging, and reporting: **Verified Complete**
-- Phase 2 — DragonForge discovery and build identification: **Implementation Complete — Verification Pending**
+- Phase 2 — DragonForge discovery and build identification: **Verified Complete**
 - Phase 3 — Static, dependency, supply-chain, and secret scanning
 - Phase 4 — Encrypted-format adversarial testing
 - Phase 5 — DragonForge Agent attack harness
