@@ -325,11 +325,11 @@ fn validate_windows_segment(segment: &str) -> Result<(), String> {
         return Err("Windows-reserved character".to_owned());
     }
 
-    let trimmed = segment.trim_end_matches(['.', ' ']);
-    let stem = trimmed
+    let stem = segment
         .split('.')
         .next()
-        .unwrap_or(trimmed)
+        .unwrap_or(segment)
+        .trim_end()
         .to_ascii_uppercase();
     if is_windows_device_name(&stem) {
         return Err("Windows reserved device name".to_owned());
@@ -382,13 +382,13 @@ pub fn run_filesystem_lab(root: &Path) -> Result<FilesystemLabReport, Filesystem
 }
 
 fn run_lab_cases(root: &Path) -> Result<FilesystemLabReport, FilesystemLabError> {
-    let mut cases = Vec::new();
-
-    cases.push(path_policy_case());
-    cases.push(containment_case(root)?);
-    cases.push(destination_race_case(root)?);
-    cases.push(hard_link_case(root)?);
-    cases.push(source_replacement_case(root)?);
+    let mut cases = vec![
+        path_policy_case(),
+        containment_case(root)?,
+        destination_race_case(root)?,
+        hard_link_case(root)?,
+        source_replacement_case(root)?,
+    ];
     cases.extend(platform_reparse_cases(root)?);
 
     if cases.len() > MAX_LAB_CASES {
