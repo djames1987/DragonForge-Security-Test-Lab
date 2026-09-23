@@ -294,12 +294,34 @@ pub fn generate_sync_request_mutations(
     fs::create_dir(output_dir)?;
 
     let mut cases = Vec::new();
+    write_auth_device_mutations(output_dir, &parsed, &mut cases)?;
+    write_revision_body_mutations(output_dir, &parsed, &mut cases)?;
+    write_enrollment_recovery_mutations(output_dir, &parsed, &mut cases)?;
+
+    let corpus = RequestMutationCorpus {
+        schema_version: 1,
+        source_sha256: hex_digest(&sha256_bytes(&bytes)),
+        cases,
+    };
+    fs::write(
+        output_dir.join("sync-api-mutations.json"),
+        corpus.to_json_pretty(),
+    )?;
+    write_manifest(output_dir)?;
+    Ok(corpus)
+}
+
+fn write_auth_device_mutations(
+    output_dir: &Path,
+    parsed: &ParsedRequest,
+    cases: &mut Vec<RequestMutationCase>,
+) -> Result<(), SyncApiError> {
     write_mutation(
         output_dir,
-        &mut cases,
+        cases,
         "exact-replay",
         "01-exact-replay.http",
-        &serialize_request(&parsed),
+        &serialize_request(parsed),
         concat!(
             "state-changing replay must not bypass revision/recovery protections; ",
             "ordinary signed GET replay is freshness-bounded by the current protocol"
@@ -310,7 +332,7 @@ pub fn generate_sync_request_mutations(
     remove_header(&mut no_auth, "authorization");
     write_mutation(
         output_dir,
-        &mut cases,
+        cases,
         "missing-bearer",
         "02-missing-bearer.http",
         &serialize_request(&no_auth),
@@ -325,7 +347,7 @@ pub fn generate_sync_request_mutations(
     );
     write_mutation(
         output_dir,
-        &mut cases,
+        cases,
         "wrong-bearer",
         "03-wrong-bearer.http",
         &serialize_request(&wrong_auth),
@@ -340,7 +362,7 @@ pub fn generate_sync_request_mutations(
     );
     write_mutation(
         output_dir,
-        &mut cases,
+        cases,
         "device-id-swap",
         "04-device-id-swap.http",
         &serialize_request(&wrong_device),
@@ -355,7 +377,7 @@ pub fn generate_sync_request_mutations(
     );
     write_mutation(
         output_dir,
-        &mut cases,
+        cases,
         "stale-device-timestamp",
         "05-stale-device-timestamp.http",
         &serialize_request(&stale_timestamp),
@@ -370,18 +392,24 @@ pub fn generate_sync_request_mutations(
     );
     write_mutation(
         output_dir,
-        &mut cases,
+        cases,
         "invalid-device-signature",
         "06-invalid-device-signature.http",
         &serialize_request(&signature_flip),
         "must fail ML-DSA request authorization",
-    )?;
+    )
+}
 
+fn write_revision_body_mutations(
+    output_dir: &Path,
+    parsed: &ParsedRequest,
+    cases: &mut Vec<RequestMutationCase>,
+) -> Result<(), SyncApiError> {
     let mut revision = parsed.clone();
     set_header(&mut revision, "X-DragonForge-Base-Revision", "0");
     write_mutation(
         output_dir,
-        &mut cases,
+        cases,
         "base-revision-zero",
         "07-base-revision-zero.http",
         &serialize_request(&revision),
@@ -397,7 +425,7 @@ pub fn generate_sync_request_mutations(
     refresh_content_length(&mut body_flip);
     write_mutation(
         output_dir,
-        &mut cases,
+        cases,
         "body-bitflip",
         "08-body-bitflip.http",
         &serialize_request(&body_flip),
@@ -409,62 +437,67 @@ pub fn generate_sync_request_mutations(
     refresh_content_length(&mut truncated);
     write_mutation(
         output_dir,
-        &mut cases,
+        cases,
         "body-truncate",
         "09-body-truncate.http",
         &serialize_request(&truncated),
         "must not be accepted as the original signed request",
-    )?;
+    )
+}
 
-    let enrollment = synthesize_json_mutation(
-        &parsed,
-        "/v1/devices/enroll",
-        br#"{"deviceId":"00000000-0000-0000-0000-000000000001","name":"","verifyingKeyHex":"00","proofSignatureHex":"00"}"#,
+fn write_enrollment_recovery_mutations(
+    output_dir: &Path,
+    parsed: &ParsedRequest,
+    cases: &mut Vec<RequestMutationCase>,
+) -> Result<(), SyncApiError> {
+    let enrollment_body = concat!(
+        r#"{"deviceId":"00000000-0000-0000-0000-000000000001","#,
+        r#""name":"","verifyingKeyHex":"00","proofSignatureHex":"00"}"#
     );
+    let enrollment =
+        synthesize_json_mutation(parsed, "/v1/devices/enroll", enrollment_body.as_bytes());
     write_mutation(
         output_dir,
-        &mut cases,
+        cases,
         "enrollment-invalid-proof",
         "10-enrollment-invalid-proof.http",
         &enrollment,
         "must reject invalid enrollment proof or invalid device key",
     )?;
 
-    let recovery_replay = synthesize_json_mutation(
-        &parsed,
+    let recovery_body = concat!(
+        r#"{"accountId":"00000000-0000-0000-0000-000000000001","#,
+        r#""vaultId":"00000000-0000-0000-0000-000000000002","generation":1,"#,
+        r#""timestamp":1,"nonceHex":"00","signatureHex":"00"}"#
+    );
+    let recovery = synthesize_json_mutation(
+        parsed,
         "/v1/recovery/begin",
-        br#"{"accountId":"00000000-0000-0000-0000-000000000001","vaultId":"00000000-0000-0000-0000-000000000002","generation":1,"timestamp":1,"nonceHex":"00","signatureHex":"00"}"#,
+        recovery_body.as_bytes(),
     );
     write_mutation(
         output_dir,
-        &mut cases,
+        cases,
         "recovery-invalid-or-replayed-nonce",
         "11-recovery-invalid-or-replayed-nonce.http",
-        &recovery_replay,
+        &recovery,
         "must reject malformed, stale, invalid-signature, or replayed recovery authorization",
     )?;
 
-    let malformed = b"POST /v1/recovery/complete HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: 1\r\n\r\n{";
+    let malformed = concat!(
+        "POST /v1/recovery/complete HTTP/1.1\r\n",
+        "Host: 127.0.0.1\r\n",
+        "Content-Type: application/json\r\n",
+        "Content-Length: 1\r\n\r\n{"
+    );
     write_mutation(
         output_dir,
-        &mut cases,
+        cases,
         "recovery-malformed-json",
         "12-recovery-malformed-json.http",
-        malformed,
+        malformed.as_bytes(),
         "must reject malformed recovery completion requests",
-    )?;
-
-    let corpus = RequestMutationCorpus {
-        schema_version: 1,
-        source_sha256: hex_digest(&sha256_bytes(&bytes)),
-        cases,
-    };
-    fs::write(
-        output_dir.join("sync-api-mutations.json"),
-        corpus.to_json_pretty(),
-    )?;
-    write_manifest(output_dir)?;
-    Ok(corpus)
+    )
 }
 
 fn parse_loopback_base_url(base_url: &str) -> Result<SocketAddrV4, SyncApiError> {
