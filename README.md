@@ -6,11 +6,11 @@ DFSTL is intentionally maintained as a separate project from the product it test
 
 ## Project status
 
-**Phase 3 — Static, Dependency, Supply-Chain, and Secret Scanning: Verified Complete**
+**Phase 4 — Encrypted-Format Adversarial Testing: Implementation Complete — Verification Pending**
 
-Phases 0 through 2 are verified complete. Phase 3 adds bounded source scanning, Cargo.lock dependency inventory, deterministic SPDX 2.3 SBOM generation, high-confidence secret detection, GitHub Actions supply-chain checks, and explicit cargo-audit/cargo-deny/gitleaks integrations.
+Phases 0 through 3 are verified complete. Phase 4 adds Controlled-class, structure-aware mutation corpora for File Vault, Backup, Secure Share, Authenticator, and Password Manager protected vault formats, with explicit authorization and tamper-evident corpus evidence.
 
-No destructive security tests are implemented through Phase 3.
+Phase 4 introduces Controlled adversarial input generation, but no Disruptive or LabOnly tests are implemented.
 
 ## Design principles
 
@@ -42,6 +42,8 @@ DragonForge-Security-Test-Lab/
 │   ├── PHASE_1_CORE_RUNNER.md
 │   ├── PHASE_2_TARGET_DISCOVERY.md
 │   ├── PHASE_3_STATIC_SUPPLY_CHAIN.md
+│   ├── PHASE_4_ENCRYPTED_FORMATS.md
+│   ├── ENCRYPTED_MUTATION_SCHEMA.md
 │   ├── REPORT_SCHEMA.md
 │   ├── STATIC_SCAN_SCHEMA.md
 │   ├── TARGET_IDENTIFICATION_SCHEMA.md
@@ -74,7 +76,7 @@ See [SAFETY.md](SAFETY.md) and [docs/TEST_TAXONOMY.md](docs/TEST_TAXONOMY.md).
 - Phase 1 — Core runner, evidence logging, and reporting: **Verified Complete**
 - Phase 2 — DragonForge discovery and build identification: **Verified Complete**
 - Phase 3 — Static, dependency, supply-chain, and secret scanning: **Verified Complete**
-- Phase 4 — Encrypted-format adversarial testing
+- Phase 4 — Encrypted-format adversarial testing: **Implementation Complete — Verification Pending**
 - Phase 5 — DragonForge Agent attack harness
 - Phase 6 — Filesystem, reparse-point, and TOCTOU laboratory
 - Phase 7 — Password Manager sync/API attack harness
@@ -109,6 +111,24 @@ cargo run -p dfstl-cli -- target inspect --target C:\DragonForge-Test-Build --js
 DFSTL reads and hashes the explicit target; it does not execute DragonForge binaries. The current Windows package contract contains 11 expected executables.
 
 See [docs/PHASE_2_TARGET_DISCOVERY.md](docs/PHASE_2_TARGET_DISCOVERY.md) and [docs/TARGET_IDENTIFICATION_SCHEMA.md](docs/TARGET_IDENTIFICATION_SCHEMA.md).
+
+## Phase 4 encrypted-format mutation
+
+```powershell
+cargo run -p dfstl-cli -- format mutate --format dfbackup --input C:\fixtures\seed.dfbackup --output .\results\backup-corpus --controlled
+```
+
+Mutation is Controlled-class and is refused unless `--controlled` is supplied. The original seed is read-only; DFSTL writes only to a new output directory and produces a SHA-256 manifest for the corpus.
+
+See [docs/PHASE_4_ENCRYPTED_FORMATS.md](docs/PHASE_4_ENCRYPTED_FORMATS.md) and [docs/ENCRYPTED_MUTATION_SCHEMA.md](docs/ENCRYPTED_MUTATION_SCHEMA.md).
+
+## Local Phase 4 validation
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-phase4-tests.ps1 -Release
+```
+
+The validator uses disposable synthetic seeds for all five format profiles and validates the Controlled safety gate, mutation matrices, non-overwrite behavior, seed immutability, corpus manifests, and runner policy behavior.
 
 ## Phase 3 source scanning
 
