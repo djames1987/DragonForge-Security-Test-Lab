@@ -186,16 +186,7 @@ pub fn run_sync_api_probe(base_url: &str) -> Result<SyncApiProbeReport, SyncApiE
     let endpoint = parse_loopback_base_url(base_url)?;
     let mut cases = Vec::new();
 
-    cases.push(probe(
-        endpoint,
-        "health",
-        "GET",
-        "/v1/health",
-        &[],
-        &[],
-        &[200],
-        Some(check_security_headers),
-    )?);
+    cases.push(probe_health(endpoint)?);
     cases.push(probe(
         endpoint,
         "missing-auth-devices",
@@ -203,8 +194,7 @@ pub fn run_sync_api_probe(base_url: &str) -> Result<SyncApiProbeReport, SyncApiE
         "/v1/devices",
         &[],
         &[],
-        &[401],
-        None,
+        &[401]
     )?);
     cases.push(probe(
         endpoint,
@@ -213,8 +203,7 @@ pub fn run_sync_api_probe(base_url: &str) -> Result<SyncApiProbeReport, SyncApiE
         "/v1/devices",
         &[("Authorization", "Bearer not-a-valid-token")],
         &[],
-        &[401],
-        None,
+        &[401]
     )?);
     cases.push(probe(
         endpoint,
@@ -223,8 +212,7 @@ pub fn run_sync_api_probe(base_url: &str) -> Result<SyncApiProbeReport, SyncApiE
         "/v1/accounts",
         &[("X-DragonForge-Admin-Token", "invalid-admin-token")],
         &[],
-        &[403],
-        None,
+        &[403]
     )?);
     cases.push(probe(
         endpoint,
@@ -233,8 +221,7 @@ pub fn run_sync_api_probe(base_url: &str) -> Result<SyncApiProbeReport, SyncApiE
         "/v1/does-not-exist",
         &[],
         &[],
-        &[404],
-        None,
+        &[404]
     )?);
     cases.push(probe(
         endpoint,
@@ -243,8 +230,7 @@ pub fn run_sync_api_probe(base_url: &str) -> Result<SyncApiProbeReport, SyncApiE
         "/v1/health",
         &[],
         &[],
-        &[405],
-        None,
+        &[405]
     )?);
     cases.push(probe(
         endpoint,
@@ -253,8 +239,7 @@ pub fn run_sync_api_probe(base_url: &str) -> Result<SyncApiProbeReport, SyncApiE
         "/v1/recovery/begin",
         &[("Content-Type", "application/json")],
         b"{",
-        &[400, 422],
-        None,
+        &[400, 422]
     )?);
 
     cases.push(probe_declared_oversize(
@@ -521,7 +506,6 @@ fn parse_loopback_base_url(base_url: &str) -> Result<SocketAddrV4, SyncApiError>
     Ok(SocketAddrV4::new(Ipv4Addr::LOCALHOST, port))
 }
 
-type ResponseCheck = fn(u16, &[(String, String)], &[u8]) -> bool;
 
 fn probe(
     endpoint: SocketAddrV4,
@@ -531,14 +515,9 @@ fn probe(
     headers: &[(&str, &str)],
     body: &[u8],
     expected_statuses: &[u16],
-    check: Option<ResponseCheck>,
 ) -> Result<LiveProbeCase, SyncApiError> {
     let response = send_http(endpoint, method, path, headers, body)?;
-    let status_ok = expected_statuses.contains(&response.0);
-    let extra_ok = match check {
-        Some(checker) => checker(response.0, &response.1, &response.2),
-        None => true,
-    };
+    let passed = expected_statuses.contains(&response.0);
     Ok(LiveProbeCase {
         id: id.to_owned(),
         expected: expected_statuses
@@ -547,11 +526,27 @@ fn probe(
             .collect::<Vec<_>>()
             .join("|"),
         status: Some(response.0),
-        passed: status_ok && extra_ok,
-        detail: if status_ok && extra_ok {
+        passed,
+        detail: if passed {
             "response matched the expected bounded security behavior".to_owned()
         } else {
             "response did not match the expected bounded security behavior".to_owned()
+        },
+    })
+}
+
+fn probe_health(endpoint: SocketAddrV4) -> Result<LiveProbeCase, SyncApiError> {
+    let response = send_http(endpoint, "GET", "/v1/health", &[], &[])?;
+    let passed = response.0 == 200 && check_security_headers(response.0, &response.1, &response.2);
+    Ok(LiveProbeCase {
+        id: "health".to_owned(),
+        expected: "200 + security headers".to_owned(),
+        status: Some(response.0),
+        passed,
+        detail: if passed {
+            "health and response security headers matched expectations".to_owned()
+        } else {
+            "health or response security headers did not match expectations".to_owned()
         },
     })
 }
@@ -568,12 +563,13 @@ fn probe_declared_oversize(
 
     let request = format!(
         concat!(
-            "POST {path} HTTP/1.1\r\n",
+            "POST {} HTTP/1.1\r\n",
             "Host: 127.0.0.1:{}\r\n",
             "Connection: close\r\n",
             "Content-Type: application/json\r\n",
             "Content-Length: {}\r\n\r\n"
         ),
+        path,
         endpoint.port(),
         SYNC_REQUEST_LIMIT_BYTES + 1
     );
@@ -611,11 +607,13 @@ fn send_http(
 
     let mut request = format!(
         concat!(
-            "{method} {path} HTTP/1.1\r\n",
+            "{} {} HTTP/1.1\r\n",
             "Host: 127.0.0.1:{}\r\n",
             "Connection: close\r\n",
             "Content-Length: {}\r\n"
         ),
+        method,
+        path,
         endpoint.port(),
         body.len()
     );
@@ -659,7 +657,7 @@ fn check_security_headers(status: u16, headers: &[(String, String)], _body: &[u8
         && header_value(headers, "referrer-policy") == Some("no-referrer")
 }
 
-fn header_value<'a>(headers: &'a [(String, String)], name: &str) -> Option<&'a str> {
+fn header_value(headers: &[(String, String)], name: &str) -> Option<&str> {
     headers
         .iter()
         .find(|(header, _)| header.eq_ignore_ascii_case(name))
@@ -930,10 +928,13 @@ mod tests {
                 };
                 let response = format!(
                     concat!(
-                        "HTTP/1.1 {status} {reason}\r\n",
-                        "{extra}Content-Length: 0\r\n",
+                        "HTTP/1.1 {} {}\r\n",
+                        "{}Content-Length: 0\r\n",
                         "Connection: close\r\n\r\n"
-                    )
+                    ),
+                    status,
+                    reason,
+                    extra
                 );
                 stream.write_all(response.as_bytes()).expect("response");
             }
