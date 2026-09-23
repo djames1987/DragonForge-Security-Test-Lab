@@ -2,7 +2,7 @@
 
 ## Status
 
-**Implementation Complete — Verification Pending**
+**Verified Complete**
 
 Phase 3 adds a Safe-class, read-only source security scanner plus explicit integrations for established Rust and Git-history security tools.
 
@@ -219,13 +219,35 @@ The validator uses disposable synthetic source repositories only. It verifies:
 
 External tools are integration capabilities, not mandatory validator prerequisites; the validator remains deterministic on workstations where cargo-audit, cargo-deny, or gitleaks are not installed.
 
-## Exit criteria
+## Verification record
 
-Phase 3 is verified when the local release-mode validator reports:
+Phase 3 was locally verified on Windows on 2026-09-23 against commit:
 
 ```text
-Warnings: 0
-Failures: 0
+d8dcae0c551947bca0fc18e5528cef167a067f36
+```
 
-PHASE 3 VALIDATION: PASS
+The release-mode validation completed with:
+
+- a clean `main` branch;
+- rustfmt passing;
+- strict Clippy passing with warnings denied;
+- 31 debug tests passing;
+- 31 release tests passing;
+- Phase 3 CLI capability checks passing;
+- clean source scan completing with full coverage;
+- dependency inventory generation passing;
+- SPDX 2.3 SBOM generation and parsing passing;
+- supply-chain warning detection passing;
+- synthetic GitHub PAT detection passing;
+- secret-value redaction from evidence passing;
+- all four Safe runner self-checks passing;
+- release build succeeding;
+- zero warnings and zero failures.
+
+Validation evidence:
+
+```text
+phase3-validation-20260923-151611.log
+SHA-256: A914C2EFA35D6489BB667B5FF8838CB9026D3403BF7CD0AB76BE65D3950F0749
 ```
