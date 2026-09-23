@@ -6,8 +6,8 @@ use std::path::PathBuf;
 use dfstl_core::{
     Artifact, EXPECTED_EXECUTABLES, ExecutionModel, ExecutionPolicy, ExternalToolStatus,
     PackageManifestStatus, Runner, SafetyClass, SecurityTest, TargetError, TestCategory,
-    TestContext, TestDescriptor, TestExecution, TestRegistry, inspect_target,
-    run_external_scanners, scan_source, write_scan_bundle, resolve_target,
+    TestContext, TestDescriptor, TestExecution, TestRegistry, inspect_target, resolve_target,
+    run_external_scanners, scan_source, write_scan_bundle,
 };
 
 fn main() {
