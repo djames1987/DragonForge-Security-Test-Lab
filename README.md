@@ -6,7 +6,7 @@ DFSTL is intentionally maintained as a separate project from the product it test
 
 ## Project status
 
-**Phase 3 — Static, Dependency, Supply-Chain, and Secret Scanning: Implementation Complete — Verification Pending**
+**Phase 3 — Static, Dependency, Supply-Chain, and Secret Scanning: Verified Complete**
 
 Phases 0 through 2 are verified complete. Phase 3 adds bounded source scanning, Cargo.lock dependency inventory, deterministic SPDX 2.3 SBOM generation, high-confidence secret detection, GitHub Actions supply-chain checks, and explicit cargo-audit/cargo-deny/gitleaks integrations.
 
@@ -73,7 +73,7 @@ See [SAFETY.md](SAFETY.md) and [docs/TEST_TAXONOMY.md](docs/TEST_TAXONOMY.md).
 - Phase 0 — Architecture, safety model, and test taxonomy: **Verified Complete**
 - Phase 1 — Core runner, evidence logging, and reporting: **Verified Complete**
 - Phase 2 — DragonForge discovery and build identification: **Verified Complete**
-- Phase 3 — Static, dependency, supply-chain, and secret scanning: **Implementation Complete — Verification Pending**
+- Phase 3 — Static, dependency, supply-chain, and secret scanning: **Verified Complete**
 - Phase 4 — Encrypted-format adversarial testing
 - Phase 5 — DragonForge Agent attack harness
 - Phase 6 — Filesystem, reparse-point, and TOCTOU laboratory
