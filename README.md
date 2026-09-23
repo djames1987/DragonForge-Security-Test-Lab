@@ -6,7 +6,7 @@ DFSTL is intentionally maintained as a separate project from the product it test
 
 ## Project status
 
-**Phase 1 — Core Runner, Evidence Logging, and Reporting: Implementation Complete — Verification Pending**
+**Phase 1 — Core Runner, Evidence Logging, and Reporting: Verified Complete**
 
 Phase 0 is verified complete. Phase 1 adds the executable test registry and runner, bounded evidence staging/finalization, structured JSON and human-readable reports, SHA-256 evidence manifests, and Safe-only built-in validation tests.
 
@@ -67,7 +67,7 @@ See [SAFETY.md](SAFETY.md) and [docs/TEST_TAXONOMY.md](docs/TEST_TAXONOMY.md).
 ## Roadmap
 
 - Phase 0 — Architecture, safety model, and test taxonomy: **Verified Complete**
-- Phase 1 — Core runner, evidence logging, and reporting: **Implementation Complete — Verification Pending**
+- Phase 1 — Core runner, evidence logging, and reporting: **Verified Complete**
 - Phase 2 — DragonForge discovery and build identification
 - Phase 3 — Static, dependency, supply-chain, and secret scanning
 - Phase 4 — Encrypted-format adversarial testing
