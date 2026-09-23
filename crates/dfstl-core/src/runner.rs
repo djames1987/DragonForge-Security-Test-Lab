@@ -61,6 +61,14 @@ pub struct TestContext<'a> {
 
 pub trait SecurityTest {
     fn descriptor(&self) -> &TestDescriptor;
+
+    /// Executes one test inside the centrally authorized run context.
+    ///
+    /// # Errors
+    ///
+    /// Returns an infrastructure-oriented error string when the test itself
+    /// cannot reliably execute. Target security failures belong in a
+    /// successful TestExecution with TestStatus::Fail.
     fn execute(&self, context: &TestContext<'_>) -> Result<TestExecution, String>;
 }
 
@@ -91,6 +99,7 @@ impl TestRegistry {
         Ok(())
     }
 
+    #[must_use]
     pub fn iter(&self) -> impl Iterator<Item = &dyn SecurityTest> {
         self.tests.iter().map(Box::as_ref)
     }
@@ -374,10 +383,11 @@ fn validate_test_id(id: &str) -> Result<(), String> {
     if id.len() < 5 || id.len() > 64 {
         return Err(format!("invalid test id length: {id}"));
     }
-    if !id
-        .bytes()
-        .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'_'))
-    {
+    if !id.bytes().all(|byte| {
+        byte.is_ascii_uppercase()
+            || byte.is_ascii_digit()
+            || matches!(byte, b'-' | b'_')
+    }) {
         return Err(format!("invalid test id characters: {id}"));
     }
     Ok(())
