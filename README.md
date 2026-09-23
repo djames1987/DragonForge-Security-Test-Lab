@@ -6,11 +6,11 @@ DFSTL is intentionally maintained as a separate project from the product it test
 
 ## Project status
 
-**Phase 5 — DragonForge Agent Attack Harness: Verified Complete**
+**Phase 6 — Filesystem, Reparse-Point, and TOCTOU Lab: Implementation Complete — Verification Pending**
 
-Phases 0 through 4 are verified complete. Phase 5 adds a Controlled-class black-box Agent attack harness for authenticated loopback IPC, replay/freshness/HMAC/format rejection testing, bounded reconnect and idle-socket behavior, plus cloned runtime/startup-race mutation fixtures.
+Phases 0 through 5 are verified complete. Phase 6 adds a LabOnly disposable filesystem harness for Windows path policy, staging containment, hard links, reparse links, destination races, and source-replacement TOCTOU behavior.
 
-Phase 5 extends Controlled adversarial testing to the local Agent IPC boundary. No Disruptive or LabOnly tests are implemented.
+Phase 6 introduces the first LabOnly execution path. It operates only beneath a brand-new explicit lab root and requires --lab-ack.
 
 ## Design principles
 
@@ -44,6 +44,8 @@ DragonForge-Security-Test-Lab/
 │   ├── PHASE_3_STATIC_SUPPLY_CHAIN.md
 │   ├── PHASE_4_ENCRYPTED_FORMATS.md
 │   ├── PHASE_5_AGENT_HARNESS.md
+│   ├── PHASE_6_FILESYSTEM_LAB.md
+│   ├── FILESYSTEM_LAB_SCHEMA.md
 │   ├── AGENT_ATTACK_SCHEMA.md
 │   ├── ENCRYPTED_MUTATION_SCHEMA.md
 │   ├── REPORT_SCHEMA.md
@@ -80,7 +82,7 @@ See [SAFETY.md](SAFETY.md) and [docs/TEST_TAXONOMY.md](docs/TEST_TAXONOMY.md).
 - Phase 3 — Static, dependency, supply-chain, and secret scanning: **Verified Complete**
 - Phase 4 — Encrypted-format adversarial testing: **Verified Complete**
 - Phase 5 — DragonForge Agent attack harness: **Verified Complete**
-- Phase 6 — Filesystem, reparse-point, and TOCTOU laboratory
+- Phase 6 — Filesystem, reparse-point, and TOCTOU laboratory: **Implementation Complete — Verification Pending**
 - Phase 7 — Password Manager sync/API attack harness
 - Phase 8 — Fuzzing and security-regression corpus
 - Phase 9 — Secret-leak and memory-lifecycle testing
@@ -113,6 +115,25 @@ cargo run -p dfstl-cli -- target inspect --target C:\DragonForge-Test-Build --js
 DFSTL reads and hashes the explicit target; it does not execute DragonForge binaries. The current Windows package contract contains 11 expected executables.
 
 See [docs/PHASE_2_TARGET_DISCOVERY.md](docs/PHASE_2_TARGET_DISCOVERY.md) and [docs/TARGET_IDENTIFICATION_SCHEMA.md](docs/TARGET_IDENTIFICATION_SCHEMA.md).
+
+## Phase 6 filesystem lab
+
+```powershell
+cargo run -p dfstl-cli -- filesystem path-corpus
+cargo run -p dfstl-cli -- filesystem lab --root C:\DFSTL-Lab\phase6-run --lab-ack
+```
+
+The path corpus is read-only. The filesystem executor is LabOnly, requires an explicit acknowledgement, and refuses an existing lab root.
+
+See [docs/PHASE_6_FILESYSTEM_LAB.md](docs/PHASE_6_FILESYSTEM_LAB.md) and [docs/FILESYSTEM_LAB_SCHEMA.md](docs/FILESYSTEM_LAB_SCHEMA.md).
+
+## Local Phase 6 validation
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-phase6-tests.ps1 -Release
+```
+
+The validator uses a disposable root beneath ignored results and checks path policy, containment, hard-link semantics, TOCTOU races, reparse reporting, evidence hashes, and Safe/Controlled/LabOnly policy enforcement.
 
 ## Phase 5 Agent attack harness
 
