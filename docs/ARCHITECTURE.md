@@ -62,7 +62,10 @@ Phase 1 extends it with:
 - cloned Agent runtime/startup-race fixture generation;
 - LabOnly disposable filesystem/reparse/TOCTOU execution;
 - deterministic Windows path-policy regression corpus;
-- filesystem-lab evidence manifests that avoid following reparse links.
+- filesystem-lab evidence manifests that avoid following reparse links;
+- Controlled Password Manager sync/API loopback probing;
+- offline captured-request mutation for signed/authenticated API traffic;
+- SHA-256 request-mutation evidence manifests.
 
 It intentionally does not contain adversarial attack implementations through Phase 1.
 
@@ -112,7 +115,7 @@ A test report must record which model was used.
 1. Unknown safety state fails closed.
 2. Default policy permits Safe tests only.
 3. A higher-risk test cannot silently downgrade its metadata.
-4. Target/source/seed/runtime/lab paths must be explicit before scanning or adversarial testing; ambiguous target discovery fails closed.
+4. Target/source/seed/runtime/lab/capture paths and live API endpoints must be explicit before scanning or adversarial testing; ambiguous or non-loopback live API targets fail closed.
 5. Evidence must not intentionally contain real secrets.
 6. Every test has a stable identifier.
 7. A failed tester/infrastructure action is not reported as a target vulnerability.
