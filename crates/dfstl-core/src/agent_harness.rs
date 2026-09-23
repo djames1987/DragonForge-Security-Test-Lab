@@ -296,18 +296,8 @@ fn build_attack_cases(address: SocketAddrV4, key: &[u8]) -> Vec<AttackCaseResult
 fn transport_attack_cases(address: SocketAddrV4) -> Vec<AttackCaseResult> {
     let oversized = vec![b'A'; MAX_WIRE_BYTES];
     let mut cases = vec![
-        send_raw_case(
-            address,
-            "malformed-json",
-            "rejected",
-            b"{not-json}\n",
-        ),
-        send_raw_case(
-            address,
-            "oversized-message",
-            "rejected",
-            &oversized,
-        ),
+        send_raw_case(address, "malformed-json", "rejected", b"{not-json}\n"),
+        send_raw_case(address, "oversized-message", "rejected", &oversized),
         send_idle_case(address),
     ];
 
@@ -368,13 +358,7 @@ fn authenticated_attack_cases(address: SocketAddrV4, key: &[u8]) -> Vec<AttackCa
     let valid = RequestSpec::new(1007, now_ms(), deterministic_nonce(7));
 
     vec![
-        send_request_case(
-            address,
-            "invalid-hmac",
-            "rejected",
-            &unsigned,
-            &invalid_tag,
-        ),
+        send_request_case(address, "invalid-hmac", "rejected", &unsigned, &invalid_tag),
         send_signed_case(address, "wrong-source", "rejected", &wrong_source, key),
         send_signed_case(
             address,
