@@ -51,7 +51,8 @@ impl Sha256 {
     }
 
     pub fn update(&mut self, mut data: &[u8]) {
-        self.total_len = self.total_len.saturating_add(data.len() as u64);
+        let added = u64::try_from(data.len()).unwrap_or(u64::MAX);
+        self.total_len = self.total_len.saturating_add(added);
 
         if self.buffer_len > 0 {
             let needed = 64 - self.buffer_len;
@@ -196,8 +197,8 @@ pub fn hex_digest(digest: &[u8; 32]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut output = String::with_capacity(64);
     for byte in digest {
-        output.push(char::from(HEX[(byte >> 4) as usize]));
-        output.push(char::from(HEX[(byte & 0x0f) as usize]));
+        output.push(char::from(HEX[usize::from(byte >> 4)]));
+        output.push(char::from(HEX[usize::from(byte & 0x0f)]));
     }
     output
 }
@@ -219,6 +220,15 @@ mod tests {
         assert_eq!(
             hex_digest(&sha256_bytes(b"abc")),
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
+    fn sha256_matches_known_multiblock_vector() {
+        let input = b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+        assert_eq!(
+            hex_digest(&sha256_bytes(input)),
+            "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1"
         );
     }
 }
