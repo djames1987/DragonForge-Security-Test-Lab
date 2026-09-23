@@ -16,7 +16,9 @@ Deliverables:
 
 ## Phase 1 — Core Runner, Evidence Logging, and Reporting
 
-Planned:
+**Status: Implementation Complete — Verification Pending**
+
+Delivered:
 - test registry and runner;
 - run IDs and deterministic metadata;
 - structured JSON evidence;
