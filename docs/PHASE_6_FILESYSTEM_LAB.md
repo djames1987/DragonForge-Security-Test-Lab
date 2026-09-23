@@ -2,7 +2,7 @@
 
 ## Status
 
-**Implementation Complete — Verification Pending**
+**Verified Complete**
 
 Phase 6 adds a disposable LabOnly filesystem-security harness for Windows-oriented path containment, reparse points, hard links, and TOCTOU race behavior.
 
@@ -153,13 +153,45 @@ The validator checks:
 - Safe/Controlled/LabOnly runner behavior;
 - release build.
 
-## Exit criteria
+## Verification record
 
-Phase 6 is verified when validation ends with:
+Phase 6 was locally verified on Windows on 2026-09-23 against commit:
 
 ```text
-Warnings: 0
-Failures: 0
+88f36595f2ded1bbc7c55fb16d28bb2c85f5399c
+```
 
-PHASE 6 VALIDATION: PASS
+The release-mode validation completed with:
+
+- a clean `main` branch;
+- rustfmt passing;
+- strict Clippy passing with warnings denied;
+- 47 debug tests passing;
+- 47 release tests passing;
+- the dedicated disposable filesystem lab regression passing;
+- the deterministic 22-case Windows path-policy regression passing;
+- a fresh Phase 6 release CLI build succeeding;
+- Phase 6 CLI capability markers passing;
+- `FS-LAB-001` registration confirmed;
+- LabOnly refusal without `--lab-ack` confirmed;
+- the disposable filesystem lab completing without failures;
+- restore/staging containment passing;
+- destination create-new race protection passing;
+- hard-link alias behavior captured;
+- source replacement race behavior captured;
+- Windows directory junction reparse testing passing;
+- Windows symbolic-link reparse cases correctly reported as skipped when the host lacked privilege;
+- filesystem JSON/text evidence generated;
+- the filesystem SHA-256 manifest independently validated;
+- Safe runner skipping Controlled and LabOnly tests as expected;
+- Controlled runner skipping only the LabOnly test;
+- LabOnly runner passing all seven registered tests;
+- release build succeeding;
+- zero warnings and zero failures.
+
+Validation evidence:
+
+```text
+phase6-validation-20260923-174644.log
+SHA-256: C1AA149346D99858E1B370B7FFB3724C4622CD2A8E122A9C8C3F03EC1A93A150
 ```
