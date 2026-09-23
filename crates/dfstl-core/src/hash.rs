@@ -71,7 +71,23 @@ const K: [u32; 64] = [
 
 #[derive(Clone)]
 pub struct Sha256 {
-    state: [
+    state: [u32; 8],
+    buffer: [u8; 64],
+    buffer_len: usize,
+    total_len: u64,
+}
+
+impl Default for Sha256 {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Sha256 {
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            state: [
                 0x6a09_e667,
                 0xbb67_ae85,
                 0x3c6e_f372,
@@ -149,6 +165,7 @@ pub struct Sha256 {
         for (index, chunk) in block.chunks_exact(4).take(16).enumerate() {
             w[index] = u32::from_be_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
         }
+
         for index in 16..64 {
             let s0 = w[index - 15].rotate_right(7)
                 ^ w[index - 15].rotate_right(18)
@@ -220,6 +237,7 @@ pub fn sha256_file(path: &Path) -> io::Result<[u8; 32]> {
     let mut file = File::open(path)?;
     let mut hasher = Sha256::new();
     let mut buffer = [0_u8; 8192];
+
     loop {
         let count = file.read(&mut buffer)?;
         if count == 0 {
@@ -227,6 +245,7 @@ pub fn sha256_file(path: &Path) -> io::Result<[u8; 32]> {
         }
         hasher.update(&buffer[..count]);
     }
+
     Ok(hasher.finalize())
 }
 
@@ -234,10 +253,12 @@ pub fn sha256_file(path: &Path) -> io::Result<[u8; 32]> {
 pub fn hex_digest(digest: &[u8; 32]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut output = String::with_capacity(64);
+
     for byte in digest {
         output.push(char::from(HEX[usize::from(byte >> 4)]));
         output.push(char::from(HEX[usize::from(byte & 0x0f)]));
     }
+
     output
 }
 
