@@ -28,6 +28,7 @@ pub enum EvidenceError {
     InvalidRunId,
     InvalidArtifactPath,
     ArtifactTooLarge,
+    ArtifactAlreadyExists,
     EvidenceLimitExceeded,
     TooManyFiles,
     SymlinkRejected,
@@ -41,6 +42,7 @@ impl fmt::Display for EvidenceError {
             Self::InvalidRunId => "invalid run identifier",
             Self::InvalidArtifactPath => "invalid artifact path",
             Self::ArtifactTooLarge => "artifact exceeds per-file evidence limit",
+            Self::ArtifactAlreadyExists => "artifact path already exists",
             Self::EvidenceLimitExceeded => "evidence exceeds total byte limit",
             Self::TooManyFiles => "evidence exceeds file-count limit",
             Self::SymlinkRejected => "symlink encountered in evidence tree",
@@ -151,6 +153,9 @@ impl EvidenceSession {
         }
 
         let temporary = destination.with_extension("dfstl-tmp");
+        if destination.exists() || temporary.exists() {
+            return Err(EvidenceError::ArtifactAlreadyExists);
+        }
         fs::write(&temporary, bytes)?;
         fs::rename(&temporary, &destination)?;
 
@@ -308,6 +313,20 @@ mod tests {
         assert!(matches!(
             session.write_artifact(root.join("absolute.txt"), b"x"),
             Err(EvidenceError::InvalidArtifactPath)
+        ));
+        drop(session);
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn duplicate_artifact_paths_are_rejected() {
+        let root = temp_root("duplicate");
+        let mut session =
+            EvidenceSession::new(&root, "run-test", EvidenceLimits::default()).expect("session");
+        session.write_artifact("proof.txt", b"first").expect("first");
+        assert!(matches!(
+            session.write_artifact("proof.txt", b"second"),
+            Err(EvidenceError::ArtifactAlreadyExists)
         ));
         drop(session);
         fs::remove_dir_all(root).expect("cleanup");
