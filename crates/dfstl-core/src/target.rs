@@ -42,10 +42,18 @@ impl fmt::Display for TargetError {
                 write!(f, "target root is not a directory: {}", path.display())
             }
             Self::NoCandidate(path) => {
-                write!(f, "no DragonForge target candidate found under {}", path.display())
+                write!(
+                    f,
+                    "no DragonForge target candidate found under {}",
+                    path.display()
+                )
             }
             Self::AmbiguousCandidates(paths) => {
-                write!(f, "multiple DragonForge target candidates found ({})", paths.len())
+                write!(
+                    f,
+                    "multiple DragonForge target candidates found ({})",
+                    paths.len()
+                )
             }
             Self::ExpectedFileIsSymlink(path) => {
                 write!(f, "expected target file is a symlink: {}", path.display())
@@ -272,12 +280,7 @@ impl TargetInspection {
                     info.release_channel.as_deref(),
                     true,
                 );
-                write_optional_json(
-                    &mut output,
-                    "git_commit",
-                    info.git_commit.as_deref(),
-                    true,
-                );
+                write_optional_json(&mut output, "git_commit", info.git_commit.as_deref(), true);
                 write_optional_json(&mut output, "git_tag", info.git_tag.as_deref(), true);
                 write_optional_json(&mut output, "built_utc", info.built_utc.as_deref(), true);
                 write_optional_json(&mut output, "platform", info.platform.as_deref(), true);
@@ -469,8 +472,11 @@ fn unexpected_executables(root: &Path) -> Result<Vec<String>, TargetError> {
 
         let name = entry.file_name().to_string_lossy().into_owned();
         let lower = name.to_ascii_lowercase();
+        let is_executable = Path::new(&name)
+            .extension()
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("exe"));
         if lower.starts_with("dragonforge-")
-            && lower.ends_with(".exe")
+            && is_executable
             && !expected.contains(lower.as_str())
         {
             unexpected.push(name);
@@ -672,7 +678,7 @@ mod tests {
 
         let mut manifest = String::new();
         let mut names = EXPECTED_EXECUTABLES.to_vec();
-        names.sort();
+        names.sort_unstable();
         for name in names {
             let digest = hex_digest(&sha256_file(&root.join(name)).expect("hash executable"));
             manifest.push_str(&digest);
