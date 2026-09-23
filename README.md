@@ -6,11 +6,11 @@ DFSTL is intentionally maintained as a separate project from the product it test
 
 ## Project status
 
-**Phase 1 — Core Runner, Evidence Logging, and Reporting: Verified Complete**
+**Phase 2 — DragonForge Discovery and Build Identification: Implementation Complete — Verification Pending**
 
-Phase 0 is verified complete. Phase 1 adds the executable test registry and runner, bounded evidence staging/finalization, structured JSON and human-readable reports, SHA-256 evidence manifests, and Safe-only built-in validation tests.
+Phases 0 and 1 are verified complete. Phase 2 adds explicit local DragonForge target selection, package completeness checks, per-executable SHA-256 identification, BUILD-INFO parsing, checksum-manifest validation, deterministic build fingerprints, and fail-closed ambiguity handling.
 
-No destructive security tests are implemented through Phase 1.
+No destructive security tests are implemented through Phase 2.
 
 ## Design principles
 
@@ -40,7 +40,9 @@ DragonForge-Security-Test-Lab/
 │   ├── ARCHITECTURE.md
 │   ├── PHASE_0_FOUNDATION.md
 │   ├── PHASE_1_CORE_RUNNER.md
+│   ├── PHASE_2_TARGET_DISCOVERY.md
 │   ├── REPORT_SCHEMA.md
+│   ├── TARGET_IDENTIFICATION_SCHEMA.md
 │   ├── ROADMAP.md
 │   ├── TEST_TAXONOMY.md
 │   └── THREAT_MODEL.md
@@ -68,7 +70,7 @@ See [SAFETY.md](SAFETY.md) and [docs/TEST_TAXONOMY.md](docs/TEST_TAXONOMY.md).
 
 - Phase 0 — Architecture, safety model, and test taxonomy: **Verified Complete**
 - Phase 1 — Core runner, evidence logging, and reporting: **Verified Complete**
-- Phase 2 — DragonForge discovery and build identification
+- Phase 2 — DragonForge discovery and build identification: **Implementation Complete — Verification Pending**
 - Phase 3 — Static, dependency, supply-chain, and secret scanning
 - Phase 4 — Encrypted-format adversarial testing
 - Phase 5 — DragonForge Agent attack harness
@@ -88,11 +90,31 @@ See [docs/ROADMAP.md](docs/ROADMAP.md).
 ```powershell
 cargo run -p dfstl-cli -- list
 cargo run -p dfstl-cli -- run --output .\results
+cargo run -p dfstl-cli -- target inspect --target C:\DragonForge-Test-Build
 ```
 
 Each completed run creates a finalized evidence directory containing `report.json`, `report.txt`, `SHA256SUMS`, and any per-test artifacts.
 
 See [docs/PHASE_1_CORE_RUNNER.md](docs/PHASE_1_CORE_RUNNER.md) and [docs/REPORT_SCHEMA.md](docs/REPORT_SCHEMA.md).
+
+## Phase 2 target identification
+
+```powershell
+cargo run -p dfstl-cli -- target inspect --target C:\DragonForge-Test-Build
+cargo run -p dfstl-cli -- target inspect --target C:\DragonForge-Test-Build --json
+```
+
+DFSTL reads and hashes the explicit target; it does not execute DragonForge binaries. The current Windows package contract contains 11 expected executables.
+
+See [docs/PHASE_2_TARGET_DISCOVERY.md](docs/PHASE_2_TARGET_DISCOVERY.md) and [docs/TARGET_IDENTIFICATION_SCHEMA.md](docs/TARGET_IDENTIFICATION_SCHEMA.md).
+
+## Local Phase 2 validation
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-phase2-tests.ps1 -Release
+```
+
+The validator builds only disposable synthetic target fixtures and proves complete, incomplete, single-candidate, and ambiguous-candidate behavior.
 
 ## Local Phase 1 validation
 
