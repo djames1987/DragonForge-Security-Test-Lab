@@ -10,7 +10,8 @@ use crate::hash::{hex_digest, sha256_bytes};
 
 pub const SYNC_PROTOCOL_VERSION: u16 = 2;
 pub const MAX_CAPTURE_BYTES: usize = 2 * 1024 * 1024;
-pub const LIVE_OVERSIZE_BYTES: usize = 64 * 1024 + 1;
+pub const SYNC_BLOB_BYTES: usize = 64 * 1024 * 1024;
+pub const SYNC_REQUEST_LIMIT_BYTES: usize = SYNC_BLOB_BYTES + 64 * 1024;
 const CONNECT_TIMEOUT: Duration = Duration::from_millis(750);
 const IO_TIMEOUT: Duration = Duration::from_secs(3);
 
@@ -256,16 +257,10 @@ pub fn run_sync_api_probe(base_url: &str) -> Result<SyncApiProbeReport, SyncApiE
         None,
     )?);
 
-    let oversized = vec![b'X'; LIVE_OVERSIZE_BYTES];
-    cases.push(probe(
+    cases.push(probe_declared_oversize(
         endpoint,
-        "oversized-recovery-request",
-        "POST",
+        "oversized-request",
         "/v1/recovery/begin",
-        &[("Content-Type", "application/json")],
-        &oversized,
-        &[400, 413, 422],
-        None,
     )?);
 
     Ok(SyncApiProbeReport {
@@ -305,7 +300,10 @@ pub fn generate_sync_request_mutations(
         "exact-replay",
         "01-exact-replay.http",
         &serialize_request(&parsed),
-        "must not bypass nonce/revision/recovery replay protections",
+        concat!(
+            "state-changing replay must not bypass revision/recovery protections; ",
+            "ordinary signed GET replay is freshness-bounded by the current protocol"
+        ),
     )?;
 
     let mut no_auth = parsed.clone();
@@ -504,7 +502,10 @@ fn probe(
 ) -> Result<LiveProbeCase, SyncApiError> {
     let response = send_http(endpoint, method, path, headers, body)?;
     let status_ok = expected_statuses.contains(&response.0);
-    let extra_ok = check.is_none_or(|checker| checker(response.0, &response.1, &response.2));
+    let extra_ok = match check {
+        Some(checker) => checker(response.0, &response.1, &response.2),
+        None => true,
+    };
     Ok(LiveProbeCase {
         id: id.to_owned(),
         expected: expected_statuses
@@ -518,6 +519,48 @@ fn probe(
             "response matched the expected bounded security behavior".to_owned()
         } else {
             "response did not match the expected bounded security behavior".to_owned()
+        },
+    })
+}
+
+
+fn probe_declared_oversize(
+    endpoint: SocketAddrV4,
+    id: &str,
+    path: &str,
+) -> Result<LiveProbeCase, SyncApiError> {
+    let mut stream = TcpStream::connect_timeout(&endpoint.into(), CONNECT_TIMEOUT)?;
+    stream.set_read_timeout(Some(IO_TIMEOUT))?;
+    stream.set_write_timeout(Some(IO_TIMEOUT))?;
+
+    let request = format!(
+        concat!(
+            "POST {path} HTTP/1.1\r\n",
+            "Host: 127.0.0.1:{}\r\n",
+            "Connection: close\r\n",
+            "Content-Type: application/json\r\n",
+            "Content-Length: {}\r\n\r\n"
+        ),
+        endpoint.port(),
+        SYNC_REQUEST_LIMIT_BYTES + 1
+    );
+    stream.write_all(request.as_bytes())?;
+    stream.shutdown(std::net::Shutdown::Write)?;
+
+    let mut bytes = Vec::new();
+    stream.take(128 * 1024).read_to_end(&mut bytes)?;
+    let response = parse_http_response(&bytes)?;
+    let passed = response.0 == 413;
+
+    Ok(LiveProbeCase {
+        id: id.to_owned(),
+        expected: "413".to_owned(),
+        status: Some(response.0),
+        passed,
+        detail: if passed {
+            "declared request above the server body limit was rejected".to_owned()
+        } else {
+            "declared request above the server body limit was not rejected as expected".to_owned()
         },
     })
 }
@@ -825,7 +868,7 @@ mod tests {
                 } else if request_line.starts_with("POST /v1/health ") {
                     405
                 } else if request_line.starts_with("POST /v1/recovery/begin ")
-                    && content_length > super::LIVE_OVERSIZE_BYTES
+                    && content_length > super::SYNC_REQUEST_LIMIT_BYTES
                 {
                     413
                 } else {
