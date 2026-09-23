@@ -399,7 +399,7 @@ fn format_mutate(arguments: &[String]) {
                     eprintln!("--format requires a value");
                     std::process::exit(2);
                 };
-                format = EncryptedFormat::parse(value);
+                format = EncryptedFormat::from_name(value);
                 if format.is_none() {
                     eprintln!("unsupported encrypted format: {value}");
                     std::process::exit(2);
