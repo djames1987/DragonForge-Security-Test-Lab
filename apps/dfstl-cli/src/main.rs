@@ -464,7 +464,10 @@ fn format_mutate(arguments: &[String]) {
     } else {
         print!("{}", corpus.to_text());
         println!("Corpus directory: {}", corpus.output_dir.display());
-        println!("Manifest: {}", corpus.output_dir.join("SHA256SUMS").display());
+        println!(
+            "Manifest: {}",
+            corpus.output_dir.join("SHA256SUMS").display()
+        );
     }
 }
 
@@ -533,14 +536,16 @@ impl SecurityTest for SafetyPolicySelfCheck {
         &DESCRIPTOR
     }
 
-    fn execute(&self, context: &TestContext<'_>) -> Result<TestExecution, String> {
-        if context.policy.allows(SafetyClass::Controlled)
-            || context.policy.allows(SafetyClass::Disruptive)
-            || context.policy.allows(SafetyClass::LabOnly)
+    fn execute(&self, _context: &TestContext<'_>) -> Result<TestExecution, String> {
+        let default_policy = ExecutionPolicy::default();
+        if !default_policy.allows(SafetyClass::Safe)
+            || default_policy.allows(SafetyClass::Controlled)
+            || default_policy.allows(SafetyClass::Disruptive)
+            || default_policy.allows(SafetyClass::LabOnly)
         {
             return Ok(TestExecution::new(
                 dfstl_core::TestStatus::Fail,
-                "default policy unexpectedly permits a higher-risk class",
+                "default execution policy is not Safe-only",
             ));
         }
 
