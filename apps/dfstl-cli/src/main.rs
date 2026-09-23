@@ -477,7 +477,9 @@ fn help() {
     println!("  describe                         Show the Phase 4 runtime model");
     println!("  list                             List registered built-in tests");
     println!("  run [--output PATH] [--controlled]");
-    println!("                                   Run registered tests within an explicit safety policy");
+    println!(
+        "                                   Run registered tests within an explicit safety policy"
+    );
     println!("  target inspect --target PATH     Identify an explicit local DragonForge build");
     println!("  source scan --source PATH        Run built-in static/dependency/secret scans");
     println!("    [--output PATH] [--json] [--external]");
