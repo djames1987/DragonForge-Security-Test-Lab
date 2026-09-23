@@ -27,7 +27,11 @@ impl fmt::Display for FilesystemLabError {
                 write!(f, "filesystem lab root is unsafe: {}", path.display())
             }
             Self::RootIsSymlink(path) => {
-                write!(f, "filesystem lab root must not be a symlink: {}", path.display())
+                write!(
+                    f,
+                    "filesystem lab root must not be a symlink: {}",
+                    path.display()
+                )
             }
         }
     }
@@ -114,11 +118,7 @@ impl FilesystemLabReport {
             };
             let _ = writeln!(output, "    {{");
             let _ = writeln!(output, "      \"id\": \"{}\",", json_escape(&case.id));
-            let _ = writeln!(
-                output,
-                "      \"status\": \"{}\",",
-                case.status.as_str()
-            );
+            let _ = writeln!(output, "      \"status\": \"{}\",", case.status.as_str());
             let _ = writeln!(
                 output,
                 "      \"detail\": \"{}\"",
@@ -190,13 +190,14 @@ impl PathCorpusReport {
                 output,
                 concat!(
                     "    {{\"id\":\"{}\",\"value\":\"{}\",",
-                    "\"expected_safe\":{},\"accepted\":{},\"reason\":\"{}\"}}{comma}"
+                    "\"expected_safe\":{},\"accepted\":{},\"reason\":\"{}\"}}{}"
                 ),
                 json_escape(&case.id),
                 json_escape(&case.value),
                 case.expected_safe,
                 case.accepted,
-                json_escape(&case.reason)
+                json_escape(&case.reason),
+                comma
             );
         }
         let _ = writeln!(output, "  ]");
@@ -598,8 +599,7 @@ fn platform_reparse_cases(root: &Path) -> Result<Vec<LabCase>, FilesystemLabErro
         Ok(output) if output.status.success() => {
             const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
             let meta = fs::symlink_metadata(&junction)?;
-            let is_reparse =
-                meta.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0;
+            let is_reparse = meta.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0;
             LabCase {
                 id: "directory-junction-reparse".to_owned(),
                 status: if is_reparse {
@@ -737,10 +737,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .expect("clock")
             .as_nanos();
-        std::env::temp_dir().join(format!(
-            "dfstl-fs-{label}-{}-{nonce}",
-            std::process::id()
-        ))
+        std::env::temp_dir().join(format!("dfstl-fs-{label}-{}-{nonce}", std::process::id()))
     }
 
     #[test]
@@ -776,12 +773,7 @@ mod tests {
         let root = temp_root("matrix");
         let report = run_filesystem_lab(&root).expect("lab");
         assert!(!report.has_failures());
-        assert!(
-            report
-                .cases
-                .iter()
-                .any(|case| case.id == "hard-link-alias")
-        );
+        assert!(report.cases.iter().any(|case| case.id == "hard-link-alias"));
         assert!(
             report
                 .cases
