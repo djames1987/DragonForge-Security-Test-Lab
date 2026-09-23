@@ -109,7 +109,7 @@ pub struct StaticScanReport {
 
 impl StaticScanReport {
     #[must_use]
-    pub fn has_high_findings(&self) -> bool {
+    pub const fn has_high_findings(&self) -> bool {
         self.counts.high_findings > 0
     }
 
@@ -297,18 +297,17 @@ pub fn scan_source(root: &Path) -> Result<StaticScanReport, StaticScanError> {
     for relative in &files {
         let full = root.join(relative);
         let metadata = fs::symlink_metadata(&full)?;
-        if metadata.len() > MAX_TEXT_FILE_BYTES {
-            continue;
-        }
-        let Ok(bytes) = fs::read(&full) else {
-            continue;
-        };
-        let digest = hex_digest(&sha256_bytes(&bytes));
+        let digest = hex_digest(&sha256_file(&full)?);
         fingerprint_material.extend_from_slice(relative.to_string_lossy().as_bytes());
         fingerprint_material.push(0);
         fingerprint_material.extend_from_slice(digest.as_bytes());
         fingerprint_material.push(b'\n');
 
+        if metadata.len() > MAX_TEXT_FILE_BYTES {
+            continue;
+        }
+
+        let bytes = fs::read(&full)?;
         let Ok(text) = String::from_utf8(bytes) else {
             continue;
         };
