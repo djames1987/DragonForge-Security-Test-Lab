@@ -905,12 +905,16 @@ fn json_escape(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::io::{BufRead, BufReader, Write};
+    use std::net::{Ipv4Addr, TcpListener};
     use std::path::PathBuf;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::thread;
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
     use super::{
         AgentAttackReport, AgentRuntime, AttackCaseResult, AttackOutcome, RuntimeMutationCorpus,
         base64_decode, base64_encode, generate_runtime_mutation_corpus, hmac_sha256,
+        json_u64, run_agent_attack_harness,
     };
     use crate::hash::hex_digest;
 
@@ -962,6 +966,79 @@ mod tests {
             }],
         };
         assert!(report.all_expected());
+    }
+
+
+    #[test]
+    fn loopback_attack_harness_exercises_expected_matrix() {
+        let root = temp_path("live-runtime");
+        fs::create_dir(&root).expect("root");
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).expect("listener");
+        let port = listener.local_addr().expect("address").port();
+        let key = [11_u8; 32];
+
+        let runtime = format!(
+            concat!(
+                "{{\"format_version\":1,\"protocol_major\":1,\"protocol_minor\":1,",
+                "\"port\":{port},\"pid\":7,\"started_at_ms\":9}}"
+            )
+        );
+        fs::write(root.join("agent-runtime.json"), runtime).expect("runtime");
+        fs::write(
+            root.join("agent-session.key"),
+            format!("{}\n", base64_encode(&key)),
+        )
+        .expect("credential");
+
+        let handle = thread::spawn(move || {
+            let mut valid_health_seen = false;
+            for _ in 0..19 {
+                let (stream, _) = listener.accept().expect("accept");
+                stream
+                    .set_read_timeout(Some(Duration::from_millis(250)))
+                    .expect("timeout");
+                let mut reader = BufReader::new(stream);
+                let mut line = String::new();
+                let read = reader.read_line(&mut line);
+
+                let Ok(count) = read else {
+                    continue;
+                };
+                if count == 0 {
+                    continue;
+                }
+
+                let Some(request_id) = json_u64(&line, "request_id") else {
+                    continue;
+                };
+                let ok = request_id == 1007 && !valid_health_seen;
+                if request_id == 1007 && !valid_health_seen {
+                    valid_health_seen = true;
+                }
+
+                let mut stream = reader.into_inner();
+                writeln!(stream, "{{\"ok\":{ok}}}").expect("response");
+            }
+        });
+
+        let report = run_agent_attack_harness(&root).expect("harness");
+        assert!(report.all_expected());
+        assert_eq!(report.cases.len(), 12);
+        assert!(
+            report
+                .cases
+                .iter()
+                .any(|case| case.id == "bounded-reconnect-stress")
+        );
+        assert!(
+            report
+                .cases
+                .iter()
+                .any(|case| case.id == "replayed-nonce")
+        );
+
+        handle.join().expect("mock server");
+        fs::remove_dir_all(root).expect("cleanup");
     }
 
     #[test]
