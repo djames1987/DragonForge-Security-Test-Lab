@@ -2,7 +2,7 @@
 
 ## Status
 
-**Implementation Complete — Verification Pending**
+**Verified Complete**
 
 Phase 4 adds bounded, structure-aware mutation corpora for DragonForge encrypted/protected file formats. Mutation is **Controlled-class** and requires explicit authorization.
 
@@ -221,13 +221,40 @@ The validator uses disposable synthetic seeds only. It verifies:
 - Controlled runner executes the test;
 - release build.
 
-## Exit criteria
+## Verification record
 
-Phase 4 is verified when the release-mode validator ends with:
+Phase 4 was locally verified on Windows on 2026-09-23 against commit:
 
 ```text
-Warnings: 0
-Failures: 0
+5f61233df66da2ac56a207551aa4b539ceedb721
+```
 
-PHASE 4 VALIDATION: PASS
+The release-mode validation completed with:
+
+- a clean `main` branch;
+- rustfmt passing;
+- strict Clippy passing with warnings denied;
+- 37 debug tests passing;
+- 37 release tests passing;
+- Phase 4 CLI capability checks passing;
+- Controlled-class registration confirmed;
+- mutation refusal without `--controlled` confirmed;
+- File Vault mutation matrix passing;
+- Authenticator mutation matrix passing;
+- Backup mutation matrix passing;
+- Secure Share mutation matrix passing;
+- Password Manager mutation matrix passing;
+- original seed hashes preserved;
+- generated corpus manifests independently verified;
+- existing output protection passing;
+- Safe runner skipping the Controlled mutation test;
+- Controlled runner passing all five registered tests;
+- release build succeeding;
+- zero warnings and zero failures.
+
+Validation evidence:
+
+```text
+phase4-validation-20260923-165138.log
+SHA-256: 9B37ECCF96C7FCB63DCE885516864EA5AE55B8F91B716309452B0972715D09B2
 ```
