@@ -68,7 +68,7 @@ pub trait SecurityTest {
     ///
     /// Returns an infrastructure-oriented error string when the test itself
     /// cannot reliably execute. Target security failures belong in a
-    /// successful TestExecution with TestStatus::Fail.
+    /// successful `TestExecution` with `TestStatus::Fail`.
     fn execute(&self, context: &TestContext<'_>) -> Result<TestExecution, String>;
 }
 
@@ -99,7 +99,6 @@ impl TestRegistry {
         Ok(())
     }
 
-    #[must_use]
     pub fn iter(&self) -> impl Iterator<Item = &dyn SecurityTest> {
         self.tests.iter().map(Box::as_ref)
     }
@@ -197,7 +196,11 @@ impl RunReport {
         let _ = writeln!(output, "  }},");
         let _ = writeln!(output, "  \"tests\": [");
         for (index, test) in self.tests.iter().enumerate() {
-            let comma = if index + 1 == self.tests.len() { "" } else { "," };
+            let comma = if index + 1 == self.tests.len() {
+                ""
+            } else {
+                ","
+            };
             let _ = writeln!(output, "    {{");
             let _ = writeln!(output, "      \"id\": \"{}\",", json_escape(&test.id));
             let _ = writeln!(output, "      \"name\": \"{}\",", json_escape(&test.name));
@@ -206,7 +209,11 @@ impl RunReport {
                 "      \"category\": \"{}\",",
                 json_escape(&test.category)
             );
-            let _ = writeln!(output, "      \"safety\": \"{}\",", json_escape(&test.safety));
+            let _ = writeln!(
+                output,
+                "      \"safety\": \"{}\",",
+                json_escape(&test.safety)
+            );
             let _ = writeln!(output, "      \"model\": \"{}\",", json_escape(&test.model));
             let _ = writeln!(output, "      \"status\": \"{}\",", test.status.as_str());
             let _ = writeln!(
@@ -215,11 +222,7 @@ impl RunReport {
                 json_escape(&test.summary)
             );
             let _ = writeln!(output, "      \"duration_ms\": {},", test.duration_ms);
-            let _ = writeln!(
-                output,
-                "      \"artifact_count\": {}",
-                test.artifact_count
-            );
+            let _ = writeln!(output, "      \"artifact_count\": {}", test.artifact_count);
             let _ = writeln!(output, "    }}{comma}");
         }
         let _ = writeln!(output, "  ]");
@@ -295,8 +298,7 @@ impl Runner {
     pub fn run(&self, registry: &TestRegistry) -> Result<CompletedRun, EvidenceError> {
         let run_id = new_run_id();
         let started = unix_ms();
-        let mut session =
-            EvidenceSession::new(&self.evidence_root, &run_id, self.evidence_limits)?;
+        let mut session = EvidenceSession::new(&self.evidence_root, &run_id, self.evidence_limits)?;
         let context = TestContext {
             run_id: &run_id,
             policy: self.policy,
@@ -319,11 +321,7 @@ impl Runner {
                 )
             } else {
                 match test.execute(&context) {
-                    Ok(execution) => (
-                        execution.status,
-                        execution.summary,
-                        execution.artifacts,
-                    ),
+                    Ok(execution) => (execution.status, execution.summary, execution.artifacts),
                     Err(error) => (
                         TestStatus::InfrastructureError,
                         format!("test execution error: {error}"),
@@ -383,11 +381,10 @@ fn validate_test_id(id: &str) -> Result<(), String> {
     if id.len() < 5 || id.len() > 64 {
         return Err(format!("invalid test id length: {id}"));
     }
-    if !id.bytes().all(|byte| {
-        byte.is_ascii_uppercase()
-            || byte.is_ascii_digit()
-            || matches!(byte, b'-' | b'_')
-    }) {
+    if !id
+        .bytes()
+        .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'_'))
+    {
         return Err(format!("invalid test id characters: {id}"));
     }
     Ok(())
@@ -449,12 +446,27 @@ mod tests {
         }
     }
 
+    struct BrokenTest(TestDescriptor);
+
+    impl SecurityTest for BrokenTest {
+        fn descriptor(&self) -> &TestDescriptor {
+            &self.0
+        }
+
+        fn execute(&self, _context: &TestContext<'_>) -> Result<TestExecution, String> {
+            Err("fixture infrastructure failure".to_owned())
+        }
+    }
+
     fn temp_root(label: &str) -> std::path::PathBuf {
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("clock after epoch")
             .as_nanos();
-        std::env::temp_dir().join(format!("dfstl-runner-{label}-{}-{nonce}", std::process::id()))
+        std::env::temp_dir().join(format!(
+            "dfstl-runner-{label}-{}-{nonce}",
+            std::process::id()
+        ))
     }
 
     fn descriptor(id: &'static str, safety: SafetyClass) -> TestDescriptor {
@@ -519,24 +531,10 @@ mod tests {
 
     #[test]
     fn execution_errors_are_infrastructure_errors_not_target_failures() {
-        struct BrokenTest(TestDescriptor);
-        impl SecurityTest for BrokenTest {
-            fn descriptor(&self) -> &TestDescriptor {
-                &self.0
-            }
-
-            fn execute(&self, _context: &TestContext<'_>) -> Result<TestExecution, String> {
-                Err("fixture infrastructure failure".to_owned())
-            }
-        }
-
         let root = temp_root("infra");
         let mut registry = TestRegistry::new();
         registry
-            .register(BrokenTest(descriptor(
-                "STATIC-CORE-002",
-                SafetyClass::Safe,
-            )))
+            .register(BrokenTest(descriptor("STATIC-CORE-002", SafetyClass::Safe)))
             .expect("register");
 
         let completed = Runner::new(ExecutionPolicy::safe_only(), &root)
@@ -570,16 +568,6 @@ mod tests {
             })
             .expect("register");
 
-        struct BrokenTest(TestDescriptor);
-        impl SecurityTest for BrokenTest {
-            fn descriptor(&self) -> &TestDescriptor {
-                &self.0
-            }
-
-            fn execute(&self, _context: &TestContext<'_>) -> Result<TestExecution, String> {
-                Err("fixture infrastructure error".to_owned())
-            }
-        }
         registry
             .register(BrokenTest(descriptor(
                 "STATIC-STATE-005",
