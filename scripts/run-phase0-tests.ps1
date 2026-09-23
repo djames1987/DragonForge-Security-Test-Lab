@@ -15,9 +15,12 @@ $Warnings = [System.Collections.Generic.List[string]]::new()
 
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 
+$Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+
 function Write-Log {
     param([string]$Message = "")
-    $Message | Tee-Object -FilePath $LogPath -Append
+    [System.IO.File]::AppendAllText($LogPath, ($Message + [Environment]::NewLine), $Utf8NoBom)
+    Write-Host $Message
 }
 
 function Write-Section {
@@ -198,8 +201,21 @@ try {
     }
 
     Write-Section "CLI smoke and safety invariants"
-    $CliOutput = (& cargo run -p dfstl-cli -- describe 2>&1 | Out-String)
-    $CliExit = $LASTEXITCODE
+    $PreviousPreference = $ErrorActionPreference
+    try {
+        # Windows PowerShell 5.1 wraps native stderr as NativeCommandError when
+        # ErrorActionPreference is Stop. Cargo writes ordinary progress output
+        # to stderr, so temporarily use Continue and evaluate the native exit code.
+        $ErrorActionPreference = "Continue"
+        $CliOutput = (& cargo run -p dfstl-cli -- describe 2>&1 | ForEach-Object {
+            $_.ToString()
+        }) -join [Environment]::NewLine
+        $CliExit = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $PreviousPreference
+    }
+
     Write-Log $CliOutput.TrimEnd()
     Write-Log ""
     Write-Log ("Exit code: {0}" -f $CliExit)
