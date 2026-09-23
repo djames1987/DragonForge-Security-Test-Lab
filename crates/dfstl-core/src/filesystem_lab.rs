@@ -1,10 +1,8 @@
 use std::fmt;
 use std::fmt::Write as _;
 use std::fs::{self, OpenOptions};
-use std::io::{self, Write};
+use std::io;
 use std::path::{Component, Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use crate::hash::{hex_digest, sha256_bytes};
 
 pub const MAX_LAB_CASES: usize = 64;
