@@ -7,8 +7,8 @@ use dfstl_core::{
     Artifact, EXPECTED_EXECUTABLES, EncryptedFormat, ExecutionModel, ExecutionPolicy,
     ExternalToolStatus, PackageManifestStatus, Runner, SafetyClass, SecurityTest, TargetError,
     TestCategory, TestContext, TestDescriptor, TestExecution, TestRegistry,
-    generate_mutation_corpus, inspect_target, resolve_target, run_external_scanners, scan_source,
-    write_scan_bundle,
+    generate_mutation_corpus, generate_runtime_mutation_corpus, inspect_target, resolve_target,
+    run_agent_attack_harness, run_external_scanners, scan_source, write_scan_bundle,
 };
 
 fn main() {
@@ -34,6 +34,10 @@ fn main() {
             let arguments: Vec<String> = args.collect();
             format_command(&arguments);
         }
+        "agent" => {
+            let arguments: Vec<String> = args.collect();
+            agent_command(&arguments);
+        }
         "version" | "--version" | "-V" => {
             println!("dfstl {}", env!("CARGO_PKG_VERSION"));
         }
@@ -49,7 +53,7 @@ fn main() {
 fn describe() {
     let policy = ExecutionPolicy::default();
     println!("DragonForge Security Test Lab");
-    println!("phase: 4");
+    println!("phase: 5");
     println!("default-safety-policy: {}", policy.maximum_class());
     println!(
         "controlled-allowed-by-default: {}",
@@ -77,7 +81,11 @@ fn describe() {
     println!("encrypted-format-mutation: available");
     println!("mutation-safety-class: controlled");
     println!("mutation-formats: dfvault,dfbackup,dfshare,dfauth,password-manager-dfvault");
-    println!("active-attack-implementations: encrypted-format-mutation");
+    println!("agent-attack-harness: available");
+    println!("agent-harness-safety-class: controlled");
+    println!("agent-protocol-baseline: 1.1");
+    println!("agent-runtime-mutation: cloned-only");
+    println!("active-attack-implementations: encrypted-format-mutation,agent-loopback-harness");
 }
 
 fn registry() -> TestRegistry {
@@ -96,6 +104,9 @@ fn registry() -> TestRegistry {
         .expect("static built-in test ID must be valid");
     registry
         .register(EncryptedFormatMutationSelfCheck)
+        .expect("static built-in test ID must be valid");
+    registry
+        .register(AgentHarnessSelfCheck)
         .expect("static built-in test ID must be valid");
     registry
 }
@@ -471,13 +482,150 @@ fn format_mutate(arguments: &[String]) {
     }
 }
 
+fn agent_command(arguments: &[String]) {
+    let Some(subcommand) = arguments.first() else {
+        eprintln!("agent requires a subcommand: attack or runtime-mutate");
+        std::process::exit(2);
+    };
+
+    match subcommand.as_str() {
+        "attack" => agent_attack(&arguments[1..]),
+        "runtime-mutate" => agent_runtime_mutate(&arguments[1..]),
+        other => {
+            eprintln!("unknown agent subcommand: {other}");
+            std::process::exit(2);
+        }
+    }
+}
+
+fn agent_attack(arguments: &[String]) {
+    let mut runtime_dir = None;
+    let mut controlled = false;
+    let mut json = false;
+    let mut index = 0_usize;
+
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--runtime-dir" => {
+                index += 1;
+                let Some(path) = arguments.get(index) else {
+                    eprintln!("--runtime-dir requires a path");
+                    std::process::exit(2);
+                };
+                runtime_dir = Some(PathBuf::from(path));
+            }
+            "--controlled" => controlled = true,
+            "--json" => json = true,
+            unknown => {
+                eprintln!("unknown agent attack option: {unknown}");
+                std::process::exit(2);
+            }
+        }
+        index += 1;
+    }
+
+    if !controlled {
+        eprintln!("Agent attack harness is Controlled-class; rerun with explicit --controlled");
+        std::process::exit(6);
+    }
+
+    let Some(runtime_dir) = runtime_dir else {
+        eprintln!("agent attack requires --runtime-dir PATH");
+        std::process::exit(2);
+    };
+
+    let report = match run_agent_attack_harness(&runtime_dir) {
+        Ok(report) => report,
+        Err(error) => {
+            eprintln!("Agent attack harness failed: {error}");
+            std::process::exit(3);
+        }
+    };
+
+    if json {
+        print!("{}", report.to_json_pretty());
+    } else {
+        print!("{}", report.to_text());
+    }
+
+    if !report.all_expected() {
+        std::process::exit(1);
+    }
+}
+
+fn agent_runtime_mutate(arguments: &[String]) {
+    let mut runtime_dir = None;
+    let mut output = None;
+    let mut controlled = false;
+    let mut json = false;
+    let mut index = 0_usize;
+
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--runtime-dir" => {
+                index += 1;
+                let Some(path) = arguments.get(index) else {
+                    eprintln!("--runtime-dir requires a path");
+                    std::process::exit(2);
+                };
+                runtime_dir = Some(PathBuf::from(path));
+            }
+            "--output" => {
+                index += 1;
+                let Some(path) = arguments.get(index) else {
+                    eprintln!("--output requires a path");
+                    std::process::exit(2);
+                };
+                output = Some(PathBuf::from(path));
+            }
+            "--controlled" => controlled = true,
+            "--json" => json = true,
+            unknown => {
+                eprintln!("unknown agent runtime-mutate option: {unknown}");
+                std::process::exit(2);
+            }
+        }
+        index += 1;
+    }
+
+    if !controlled {
+        eprintln!("Agent runtime mutation is Controlled-class; rerun with explicit --controlled");
+        std::process::exit(6);
+    }
+
+    let Some(runtime_dir) = runtime_dir else {
+        eprintln!("agent runtime-mutate requires --runtime-dir PATH");
+        std::process::exit(2);
+    };
+    let Some(output) = output else {
+        eprintln!("agent runtime-mutate requires --output PATH");
+        std::process::exit(2);
+    };
+
+    let corpus = match generate_runtime_mutation_corpus(&runtime_dir, &output) {
+        Ok(corpus) => corpus,
+        Err(error) => {
+            eprintln!("Agent runtime mutation failed: {error}");
+            std::process::exit(3);
+        }
+    };
+
+    if json {
+        print!("{}", corpus.to_json_pretty());
+    } else {
+        println!("DragonForge Agent runtime mutation corpus");
+        println!("Cases: {}", corpus.cases.len());
+        println!("Output: {}", output.display());
+    }
+}
+
 fn help() {
     println!("DragonForge Security Test Lab");
     println!();
     println!("Usage: dfstl <command>");
     println!();
     println!("Commands:");
-    println!("  describe                         Show the Phase 4 runtime model");
+    println!("  describe                         Show the Phase 5 runtime model");
     println!("  list                             List registered built-in tests");
     println!("  run [--output PATH] [--controlled]");
     println!(
@@ -488,6 +636,10 @@ fn help() {
     println!("    [--output PATH] [--json] [--external]");
     println!("  format mutate --format NAME      Generate bounded adversarial encrypted inputs");
     println!("    --input PATH --output PATH --controlled [--json]");
+    println!("  agent attack --runtime-dir PATH  Exercise explicit live loopback Agent runtime");
+    println!("    --controlled [--json]");
+    println!("  agent runtime-mutate             Generate cloned runtime/startup-race fixtures");
+    println!("    --runtime-dir PATH --output PATH --controlled [--json]");
     println!("  version                          Show the CLI version");
     println!("  help                 Show this help");
 }
@@ -628,6 +780,34 @@ impl SecurityTest for EncryptedFormatMutationSelfCheck {
 
         Ok(TestExecution::pass(
             "bounded encrypted-format mutation capability is authorized",
+        ))
+    }
+}
+
+struct AgentHarnessSelfCheck;
+
+impl SecurityTest for AgentHarnessSelfCheck {
+    fn descriptor(&self) -> &TestDescriptor {
+        static DESCRIPTOR: TestDescriptor = TestDescriptor::new(
+            "IPC-AGENT-001",
+            "DragonForge Agent attack harness capability",
+            TestCategory::LocalIpc,
+            SafetyClass::Controlled,
+            ExecutionModel::BlackBox,
+        );
+        &DESCRIPTOR
+    }
+
+    fn execute(&self, context: &TestContext<'_>) -> Result<TestExecution, String> {
+        if !context.policy.allows(SafetyClass::Controlled) {
+            return Ok(TestExecution::new(
+                dfstl_core::TestStatus::Fail,
+                "Controlled Agent harness test executed without Controlled policy",
+            ));
+        }
+
+        Ok(TestExecution::pass(
+            "bounded loopback Agent attack harness is authorized",
         ))
     }
 }
