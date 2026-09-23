@@ -3,6 +3,7 @@ use std::fmt::Write as _;
 use std::fs::{self, OpenOptions};
 use std::io;
 use std::path::{Component, Path, PathBuf};
+
 use crate::hash::{hex_digest, sha256_bytes};
 
 pub const MAX_LAB_CASES: usize = 64;
@@ -271,7 +272,7 @@ pub fn validate_windows_relative_path(value: &str) -> Result<(), String> {
     if value.contains('\\') {
         return Err("backslash separator".to_owned());
     }
-    if value.starts_with('/') || value.starts_with("//") {
+    if value.starts_with('/') {
         return Err("absolute or UNC-like path".to_owned());
     }
     if value.contains(':') {
@@ -355,7 +356,7 @@ fn is_windows_device_name(stem: &str) -> bool {
         )
 }
 
-/// Runs the disposable LabOnly filesystem test matrix under one new explicit root.
+/// Runs the disposable `LabOnly` filesystem test matrix under one new explicit root.
 ///
 /// The root must not already exist. The harness never operates outside that root.
 ///
@@ -415,7 +416,13 @@ fn validate_new_lab_root(root: &Path) -> Result<(), FilesystemLabError> {
         std::env::current_dir()?.join(root)
     };
     let depth = absolute.components().count();
-    if depth < 3 || absolute.parent().is_none() {
+    let parent = absolute
+        .parent()
+        .ok_or_else(|| FilesystemLabError::UnsafeRoot(root.to_path_buf()))?;
+    if depth < 3 || !parent.is_dir() {
+        return Err(FilesystemLabError::UnsafeRoot(root.to_path_buf()));
+    }
+    if fs::symlink_metadata(parent)?.file_type().is_symlink() {
         return Err(FilesystemLabError::UnsafeRoot(root.to_path_buf()));
     }
     Ok(())
@@ -441,9 +448,8 @@ fn containment_case(root: &Path) -> Result<LabCase, FilesystemLabError> {
     let staging = root.join("containment").join("staging");
     fs::create_dir_all(&staging)?;
     let safe = "nested/file.txt";
-    validate_windows_relative_path(safe).map_err(|_| {
-        FilesystemLabError::UnsafeRoot(root.to_path_buf())
-    })?;
+    validate_windows_relative_path(safe)
+        .map_err(|_| FilesystemLabError::UnsafeRoot(root.to_path_buf()))?;
     let target = staging.join(safe);
     fs::create_dir_all(target.parent().unwrap_or(&staging))?;
     fs::write(&target, b"contained")?;
@@ -535,7 +541,8 @@ fn source_replacement_case(root: &Path) -> Result<LabCase, FilesystemLabError> {
         } else {
             LabCaseStatus::Fail
         },
-        detail: "disposable source was replaced between metadata observation and later read".to_owned(),
+        detail: "disposable source was replaced between metadata observation and later read"
+            .to_owned(),
     })
 }
 
