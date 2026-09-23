@@ -249,6 +249,7 @@ try {
     try {
         $Report = $Clean.Output | ConvertFrom-Json
         Assert-True "static scan schema_version is 1" ($Report.schema_version -eq 1)
+        Assert-True "clean scan coverage is complete" ($Report.coverage_truncated -eq $false)
         Assert-True "clean fixture has zero high findings" ($Report.counts.high_findings -eq 0)
         Assert-True "clean fixture has zero supply-chain findings" ($Report.counts.supply_chain_findings -eq 0)
         Assert-True "clean fixture has two Cargo.lock records" ($Report.dependency_count -eq 2)
