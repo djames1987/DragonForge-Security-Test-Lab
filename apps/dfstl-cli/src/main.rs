@@ -7,8 +7,9 @@ use dfstl_core::{
     Artifact, EXPECTED_EXECUTABLES, EncryptedFormat, ExecutionModel, ExecutionPolicy,
     ExternalToolStatus, PackageManifestStatus, Runner, SafetyClass, SecurityTest, TargetError,
     TestCategory, TestContext, TestDescriptor, TestExecution, TestRegistry,
-    generate_mutation_corpus, generate_runtime_mutation_corpus, inspect_target, resolve_target,
-    run_agent_attack_harness, run_external_scanners, scan_source, write_scan_bundle,
+    generate_mutation_corpus, generate_runtime_mutation_corpus, inspect_target, path_policy_corpus,
+    resolve_target, run_agent_attack_harness, run_external_scanners, run_filesystem_lab,
+    scan_source, write_scan_bundle,
 };
 
 fn main() {
@@ -38,6 +39,10 @@ fn main() {
             let arguments: Vec<String> = args.collect();
             agent_command(&arguments);
         }
+        "filesystem" => {
+            let arguments: Vec<String> = args.collect();
+            filesystem_command(&arguments);
+        }
         "version" | "--version" | "-V" => {
             println!("dfstl {}", env!("CARGO_PKG_VERSION"));
         }
@@ -53,7 +58,7 @@ fn main() {
 fn describe() {
     let policy = ExecutionPolicy::default();
     println!("DragonForge Security Test Lab");
-    println!("phase: 5");
+    println!("phase: 6");
     println!("default-safety-policy: {}", policy.maximum_class());
     println!(
         "controlled-allowed-by-default: {}",
@@ -85,7 +90,14 @@ fn describe() {
     println!("agent-harness-safety-class: controlled");
     println!("agent-protocol-baseline: 1.1");
     println!("agent-runtime-mutation: cloned-only");
-    println!("active-attack-implementations: encrypted-format-mutation,agent-loopback-harness");
+    println!("filesystem-path-corpus: available");
+    println!("filesystem-lab: available");
+    println!("filesystem-lab-safety-class: lab-only");
+    println!("windows-reparse-testing: available");
+    println!("toctou-race-testing: disposable-only");
+    println!(
+        "active-attack-implementations: encrypted-format-mutation,agent-loopback-harness,filesystem-lab"
+    );
 }
 
 fn registry() -> TestRegistry {
@@ -109,6 +121,9 @@ fn registry() -> TestRegistry {
         .register(AgentHarnessSelfCheck)
         .expect("static built-in test ID must be valid");
     registry
+        .register(FilesystemLabSelfCheck)
+        .expect("static built-in test ID must be valid");
+    registry
 }
 
 fn list_tests() {
@@ -129,6 +144,7 @@ fn list_tests() {
 fn run_command(arguments: &[String]) {
     let mut output = PathBuf::from("results");
     let mut controlled = false;
+    let mut lab_acknowledged = false;
     let mut index = 0_usize;
     while index < arguments.len() {
         match arguments[index].as_str() {
@@ -141,6 +157,7 @@ fn run_command(arguments: &[String]) {
                 output = PathBuf::from(path);
             }
             "--controlled" => controlled = true,
+            "--lab-ack" => lab_acknowledged = true,
             unknown => {
                 eprintln!("unknown run option: {unknown}");
                 std::process::exit(2);
@@ -150,7 +167,9 @@ fn run_command(arguments: &[String]) {
     }
 
     let registry = registry();
-    let policy = if controlled {
+    let policy = if lab_acknowledged {
+        ExecutionPolicy::lab_only_acknowledged()
+    } else if controlled {
         ExecutionPolicy::controlled()
     } else {
         ExecutionPolicy::safe_only()
@@ -619,15 +638,93 @@ fn agent_runtime_mutate(arguments: &[String]) {
     }
 }
 
+fn filesystem_command(arguments: &[String]) {
+    let Some(subcommand) = arguments.first() else {
+        eprintln!("filesystem requires a subcommand: path-corpus or lab");
+        std::process::exit(2);
+    };
+
+    match subcommand.as_str() {
+        "path-corpus" => {
+            let report = path_policy_corpus();
+            print!("{}", report.to_json_pretty());
+            if !report.all_expected() {
+                std::process::exit(1);
+            }
+        }
+        "lab" => filesystem_lab_command(&arguments[1..]),
+        other => {
+            eprintln!("unknown filesystem subcommand: {other}");
+            std::process::exit(2);
+        }
+    }
+}
+
+fn filesystem_lab_command(arguments: &[String]) {
+    let mut root = None;
+    let mut lab_acknowledged = false;
+    let mut json = false;
+    let mut index = 0_usize;
+
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--root" => {
+                index += 1;
+                let Some(path) = arguments.get(index) else {
+                    eprintln!("--root requires a path");
+                    std::process::exit(2);
+                };
+                root = Some(PathBuf::from(path));
+            }
+            "--lab-ack" => lab_acknowledged = true,
+            "--json" => json = true,
+            unknown => {
+                eprintln!("unknown filesystem lab option: {unknown}");
+                std::process::exit(2);
+            }
+        }
+        index += 1;
+    }
+
+    if !lab_acknowledged {
+        eprintln!("filesystem lab is LabOnly; rerun with explicit --lab-ack");
+        std::process::exit(7);
+    }
+
+    let Some(root) = root else {
+        eprintln!("filesystem lab requires --root PATH");
+        std::process::exit(2);
+    };
+
+    let report = match run_filesystem_lab(&root) {
+        Ok(report) => report,
+        Err(error) => {
+            eprintln!("filesystem lab failed: {error}");
+            std::process::exit(3);
+        }
+    };
+
+    if json {
+        print!("{}", report.to_json_pretty());
+    } else {
+        print!("{}", report.to_text());
+        println!("Manifest: {}", root.join("SHA256SUMS").display());
+    }
+
+    if report.has_failures() {
+        std::process::exit(1);
+    }
+}
+
 fn help() {
     println!("DragonForge Security Test Lab");
     println!();
     println!("Usage: dfstl <command>");
     println!();
     println!("Commands:");
-    println!("  describe                         Show the Phase 5 runtime model");
+    println!("  describe                         Show the Phase 6 runtime model");
     println!("  list                             List registered built-in tests");
-    println!("  run [--output PATH] [--controlled]");
+    println!("  run [--output PATH] [--controlled] [--lab-ack]");
     println!(
         "                                   Run registered tests within an explicit safety policy"
     );
@@ -640,6 +737,9 @@ fn help() {
     println!("    --controlled [--json]");
     println!("  agent runtime-mutate             Generate cloned runtime/startup-race fixtures");
     println!("    --runtime-dir PATH --output PATH --controlled [--json]");
+    println!("  filesystem path-corpus           Emit deterministic Windows path-policy cases");
+    println!("  filesystem lab --root PATH       Run disposable reparse/TOCTOU lab");
+    println!("    --lab-ack [--json]");
     println!("  version                          Show the CLI version");
     println!("  help                 Show this help");
 }
@@ -808,6 +908,34 @@ impl SecurityTest for AgentHarnessSelfCheck {
 
         Ok(TestExecution::pass(
             "bounded loopback Agent attack harness is authorized",
+        ))
+    }
+}
+
+struct FilesystemLabSelfCheck;
+
+impl SecurityTest for FilesystemLabSelfCheck {
+    fn descriptor(&self) -> &TestDescriptor {
+        static DESCRIPTOR: TestDescriptor = TestDescriptor::new(
+            "FS-LAB-001",
+            "Filesystem reparse and TOCTOU lab capability",
+            TestCategory::Filesystem,
+            SafetyClass::LabOnly,
+            ExecutionModel::Hybrid,
+        );
+        &DESCRIPTOR
+    }
+
+    fn execute(&self, context: &TestContext<'_>) -> Result<TestExecution, String> {
+        if !context.policy.allows(SafetyClass::LabOnly) {
+            return Ok(TestExecution::new(
+                dfstl_core::TestStatus::Fail,
+                "LabOnly filesystem test executed without lab acknowledgement",
+            ));
+        }
+
+        Ok(TestExecution::pass(
+            "disposable filesystem reparse/TOCTOU lab is explicitly authorized",
         ))
     }
 }
