@@ -38,14 +38,14 @@ The scan is bounded and read-only.
 
 ### Traversal limits
 
-- maximum 25,000 discovered files;
+- maximum 25,000 discovered files; reaching the cap sets `coverage_truncated: true` and returns coverage-incomplete exit code 5;
 - maximum 2 MiB per text file;
 - symlinks are not followed;
 - `.git`, `target`, `node_modules`, `dist`, `test-logs`, and `results` directories are skipped.
 
 ### Source fingerprint
 
-Every readable scanned file contributes its relative path and SHA-256 to a deterministic source fingerprint.
+Every discovered regular file contributes its relative path and SHA-256 to a deterministic source fingerprint, including files too large or non-textual for content scanning.
 
 The fingerprint correlates scan evidence with the exact source tree examined. It is not a source-authenticity signature.
 
