@@ -13,7 +13,7 @@ env:
 
 jobs:
   validation:
-    name: Phase 5 Agent Harness
+    name: Phase 6 Filesystem Lab
     runs-on: ubuntu-latest
 
     steps:
@@ -38,41 +38,37 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
-      - name: Phase 5 Agent harness smoke test
+      - name: Phase 6 filesystem smoke test
         shell: pwsh
         run: |
           $Describe = cargo run -p dfstl-cli -- describe
           $Describe
-          if ($Describe -notmatch "phase: 5") { throw "Phase marker missing" }
-          if ($Describe -notmatch "agent-attack-harness: available") { throw "Agent harness capability missing" }
-          if ($Describe -notmatch "agent-harness-safety-class: controlled") { throw "Agent safety marker missing" }
+          if ($Describe -notmatch "phase: 6") { throw "Phase marker missing" }
+          if ($Describe -notmatch "filesystem-lab: available") { throw "Filesystem lab capability missing" }
+          if ($Describe -notmatch "filesystem-lab-safety-class: lab-only") { throw "LabOnly safety marker missing" }
 
           $List = cargo run -p dfstl-cli -- list
           $List
-          if ($List -notmatch "IPC-AGENT-001") { throw "Phase 5 Agent test missing" }
+          if ($List -notmatch "FS-LAB-001") { throw "Phase 6 filesystem test missing" }
 
-          cargo test -p dfstl-core loopback_attack_harness_exercises_expected_matrix
-          if ($LASTEXITCODE -ne 0) { throw "Loopback Agent harness regression failed" }
+          $Corpus = cargo run -p dfstl-cli -- filesystem path-corpus
+          $Corpus
+          if ($LASTEXITCODE -ne 0) { throw "Path corpus failed" }
 
-          $Runtime = Join-Path $PWD "ci-agent-runtime"
-          New-Item -ItemType Directory -Force -Path $Runtime | Out-Null
-          @'
-{"format_version":1,"protocol_major":1,"protocol_minor":1,"port":6553,"pid":7,"started_at_ms":1}
-'@ | Set-Content -LiteralPath (Join-Path $Runtime "agent-runtime.json") -NoNewline
-          [IO.File]::WriteAllText(
-            (Join-Path $Runtime "agent-session.key"),
-            ([Convert]::ToBase64String([byte[]](1..32 | ForEach-Object { 9 })) + [Environment]::NewLine)
-          )
+          New-Item -ItemType Directory -Force -Path ci-phase6 | Out-Null
+          $LabRoot = Join-Path $PWD "ci-phase6/lab"
+          cargo run -p dfstl-cli -- filesystem lab --root $LabRoot --lab-ack --json
+          if ($LASTEXITCODE -ne 0) { throw "Filesystem lab failed" }
 
-          cargo run -p dfstl-cli -- agent runtime-mutate --runtime-dir $Runtime --output ci-agent-mutations --controlled --json
-          if ($LASTEXITCODE -ne 0) { throw "Runtime mutation smoke test failed" }
-
-          $Corpus = Get-Content ci-agent-mutations/runtime-mutations.json -Raw | ConvertFrom-Json
-          if ($Corpus.schema_version -ne 1) { throw "Unexpected runtime mutation schema" }
-          if ($Corpus.cases.Count -ne 8) { throw "Unexpected runtime mutation case count" }
+          $Report = Get-Content (Join-Path $LabRoot "filesystem-lab.json") -Raw | ConvertFrom-Json
+          if ($Report.schema_version -ne 1) { throw "Unexpected filesystem lab schema" }
+          if ($Report.has_failures) { throw "Filesystem lab reported a failure" }
 
           cargo run -p dfstl-cli -- run --output ci-safe-results
           if ($LASTEXITCODE -ne 0) { throw "Safe runner regression failed" }
 
           cargo run -p dfstl-cli -- run --controlled --output ci-controlled-results
           if ($LASTEXITCODE -ne 0) { throw "Controlled runner regression failed" }
+
+          cargo run -p dfstl-cli -- run --lab-ack --output ci-lab-results
+          if ($LASTEXITCODE -ne 0) { throw "LabOnly runner regression failed" }
