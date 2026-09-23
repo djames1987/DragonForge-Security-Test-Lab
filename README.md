@@ -6,11 +6,11 @@ DFSTL is intentionally maintained as a separate project from the product it test
 
 ## Project status
 
-**Phase 6 — Filesystem, Reparse-Point, and TOCTOU Lab: Verified Complete**
+**Phase 7 — Password Manager Sync/API Security Testing: Implementation Complete — Verification Pending**
 
-Phases 0 through 5 are verified complete. Phase 6 adds a LabOnly disposable filesystem harness for Windows path policy, staging containment, hard links, reparse links, destination races, and source-replacement TOCTOU behavior.
+Phases 0 through 6 are verified complete. Phase 7 adds a Controlled Password Manager sync/API harness with bounded loopback probes and an offline captured-request mutation corpus for authentication, device authorization, replay, revisions, enrollment, and recovery boundaries.
 
-Phase 6 introduces the first LabOnly execution path. It operates only beneath a brand-new explicit lab root and requires --lab-ack.
+Phase 7 live probes are IPv4-loopback-only and non-state-changing. State-changing request mutations are generated offline and are never automatically transmitted.
 
 ## Design principles
 
@@ -45,6 +45,8 @@ DragonForge-Security-Test-Lab/
 │   ├── PHASE_4_ENCRYPTED_FORMATS.md
 │   ├── PHASE_5_AGENT_HARNESS.md
 │   ├── PHASE_6_FILESYSTEM_LAB.md
+│   ├── PHASE_7_SYNC_API_HARNESS.md
+│   ├── SYNC_API_MUTATION_SCHEMA.md
 │   ├── FILESYSTEM_LAB_SCHEMA.md
 │   ├── AGENT_ATTACK_SCHEMA.md
 │   ├── ENCRYPTED_MUTATION_SCHEMA.md
@@ -83,7 +85,7 @@ See [SAFETY.md](SAFETY.md) and [docs/TEST_TAXONOMY.md](docs/TEST_TAXONOMY.md).
 - Phase 4 — Encrypted-format adversarial testing: **Verified Complete**
 - Phase 5 — DragonForge Agent attack harness: **Verified Complete**
 - Phase 6 — Filesystem, reparse-point, and TOCTOU laboratory: **Verified Complete**
-- Phase 7 — Password Manager sync/API attack harness
+- Phase 7 — Password Manager sync/API attack harness: **Implementation Complete — Verification Pending**
 - Phase 8 — Fuzzing and security-regression corpus
 - Phase 9 — Secret-leak and memory-lifecycle testing
 - Phase 10 — Failure injection and resource-exhaustion testing
@@ -115,6 +117,25 @@ cargo run -p dfstl-cli -- target inspect --target C:\DragonForge-Test-Build --js
 DFSTL reads and hashes the explicit target; it does not execute DragonForge binaries. The current Windows package contract contains 11 expected executables.
 
 See [docs/PHASE_2_TARGET_DISCOVERY.md](docs/PHASE_2_TARGET_DISCOVERY.md) and [docs/TARGET_IDENTIFICATION_SCHEMA.md](docs/TARGET_IDENTIFICATION_SCHEMA.md).
+
+## Phase 7 Password Manager sync/API harness
+
+```powershell
+cargo run -p dfstl-cli -- sync-api probe --base-url http://127.0.0.1:8787 --controlled
+cargo run -p dfstl-cli -- sync-api mutate --input .\capture.http --output .\results\sync-api-mutations --controlled
+```
+
+The live probe is restricted to an explicit IPv4-loopback sync server and performs only non-state-changing checks. Captured request mutations are generated offline and are never transmitted automatically.
+
+See [docs/PHASE_7_SYNC_API_HARNESS.md](docs/PHASE_7_SYNC_API_HARNESS.md) and [docs/SYNC_API_MUTATION_SCHEMA.md](docs/SYNC_API_MUTATION_SCHEMA.md).
+
+## Local Phase 7 validation
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-phase7-tests.ps1 -Release
+```
+
+The validator checks the protocol-v2 model, deterministic loopback probe, 12-case offline mutation corpus, source immutability, SHA-256 evidence, and Safe/Controlled/LabOnly runner behavior.
 
 ## Phase 6 filesystem lab
 
