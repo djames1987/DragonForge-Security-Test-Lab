@@ -81,6 +81,37 @@ See [SAFETY.md](SAFETY.md) and [docs/TEST_TAXONOMY.md](docs/TEST_TAXONOMY.md).
 
 See [docs/ROADMAP.md](docs/ROADMAP.md).
 
+## Local Phase 0 validation
+
+On Windows, run the complete validation harness from the repository root:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-phase0-tests.ps1
+```
+
+Or double-click/run:
+
+```text
+scripts\run-phase0-tests.cmd
+```
+
+For an additional release-mode test pass:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-phase0-tests.ps1 -Release
+```
+
+The validator records environment/tool versions, repository branch/commit/cleanliness, required Phase 0 files, Cargo metadata, rustfmt, strict Clippy, debug tests, optional release tests, CLI safety invariants, and a release build. It writes a timestamped log and SHA-256 sidecar under `test-logs/`.
+
+Example:
+
+```text
+test-logs\phase0-validation-20260923-134500.log
+test-logs\phase0-validation-20260923-134500.log.sha256
+```
+
+Upload the `.log` file for review if validation fails or when recording Phase 0 verification evidence.
+
 ## Development
 
 ```powershell
