@@ -548,6 +548,58 @@ mod tests {
     }
 
     #[test]
+    fn runner_preserves_distinct_result_states() {
+        let root = temp_root("states");
+        let mut registry = TestRegistry::new();
+        for (id, status) in [
+            ("STATIC-STATE-001", TestStatus::Pass),
+            ("STATIC-STATE-002", TestStatus::Fail),
+            ("STATIC-STATE-003", TestStatus::Warning),
+        ] {
+            registry
+                .register(FixtureTest {
+                    descriptor: descriptor(id, SafetyClass::Safe),
+                    execution: TestExecution::new(status, "state fixture"),
+                })
+                .expect("register");
+        }
+        registry
+            .register(FixtureTest {
+                descriptor: descriptor("STATIC-STATE-004", SafetyClass::Controlled),
+                execution: TestExecution::pass("must be skipped"),
+            })
+            .expect("register");
+
+        struct BrokenTest(TestDescriptor);
+        impl SecurityTest for BrokenTest {
+            fn descriptor(&self) -> &TestDescriptor {
+                &self.0
+            }
+
+            fn execute(&self, _context: &TestContext<'_>) -> Result<TestExecution, String> {
+                Err("fixture infrastructure error".to_owned())
+            }
+        }
+        registry
+            .register(BrokenTest(descriptor(
+                "STATIC-STATE-005",
+                SafetyClass::Safe,
+            )))
+            .expect("register");
+
+        let completed = Runner::new(ExecutionPolicy::safe_only(), &root)
+            .run(&registry)
+            .expect("run");
+        assert_eq!(completed.report.counts.pass, 1);
+        assert_eq!(completed.report.counts.fail, 1);
+        assert_eq!(completed.report.counts.warning, 1);
+        assert_eq!(completed.report.counts.skipped, 1);
+        assert_eq!(completed.report.counts.infrastructure_error, 1);
+        assert_eq!(completed.report.counts.total(), 5);
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
     fn duplicate_test_ids_are_rejected() {
         let mut registry = TestRegistry::new();
         registry
