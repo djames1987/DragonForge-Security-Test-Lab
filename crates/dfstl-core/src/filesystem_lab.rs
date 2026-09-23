@@ -543,10 +543,10 @@ fn source_replacement_case(root: &Path) -> Result<LabCase, FilesystemLabError> {
 
     Ok(LabCase {
         id: "source-replacement-race".to_owned(),
-        status: if length_before != length_after {
-            LabCaseStatus::Pass
-        } else {
+        status: if length_before == length_after {
             LabCaseStatus::Fail
+        } else {
+            LabCaseStatus::Pass
         },
         detail: "disposable source was replaced between metadata observation and later read"
             .to_owned(),
