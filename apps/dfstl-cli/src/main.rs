@@ -7,9 +7,9 @@ use dfstl_core::{
     Artifact, EXPECTED_EXECUTABLES, EncryptedFormat, ExecutionModel, ExecutionPolicy,
     ExternalToolStatus, PackageManifestStatus, Runner, SafetyClass, SecurityTest, TargetError,
     TestCategory, TestContext, TestDescriptor, TestExecution, TestRegistry,
-    generate_mutation_corpus, generate_runtime_mutation_corpus, inspect_target, path_policy_corpus,
-    resolve_target, run_agent_attack_harness, run_external_scanners, run_filesystem_lab,
-    scan_source, write_scan_bundle,
+    generate_mutation_corpus, generate_runtime_mutation_corpus, generate_sync_request_mutations,
+    inspect_target, path_policy_corpus, resolve_target, run_agent_attack_harness,
+    run_external_scanners, run_filesystem_lab, run_sync_api_probe, scan_source, write_scan_bundle,
 };
 
 fn main() {
@@ -43,6 +43,10 @@ fn main() {
             let arguments: Vec<String> = args.collect();
             filesystem_command(&arguments);
         }
+        "sync-api" => {
+            let arguments: Vec<String> = args.collect();
+            sync_api_command(&arguments);
+        }
         "version" | "--version" | "-V" => {
             println!("dfstl {}", env!("CARGO_PKG_VERSION"));
         }
@@ -58,7 +62,7 @@ fn main() {
 fn describe() {
     let policy = ExecutionPolicy::default();
     println!("DragonForge Security Test Lab");
-    println!("phase: 6");
+    println!("phase: 7");
     println!("default-safety-policy: {}", policy.maximum_class());
     println!(
         "controlled-allowed-by-default: {}",
@@ -95,6 +99,11 @@ fn describe() {
     println!("filesystem-lab-safety-class: lab-only");
     println!("windows-reparse-testing: available");
     println!("toctou-race-testing: disposable-only");
+    println!("password-manager-sync-api-harness: available");
+    println!("sync-api-protocol-baseline: 2");
+    println!("sync-api-live-safety-class: controlled");
+    println!("sync-api-live-target: ipv4-loopback-only");
+    println!("sync-api-request-mutation: offline-only");
     println!(concat!(
         "active-attack-implementations: encrypted-format-mutation,",
         "agent-loopback-harness,filesystem-lab"
@@ -123,6 +132,9 @@ fn registry() -> TestRegistry {
         .expect("static built-in test ID must be valid");
     registry
         .register(FilesystemLabSelfCheck)
+        .expect("static built-in test ID must be valid");
+    registry
+        .register(SyncApiHarnessSelfCheck)
         .expect("static built-in test ID must be valid");
     registry
 }
@@ -717,13 +729,161 @@ fn filesystem_lab_command(arguments: &[String]) {
     }
 }
 
+fn sync_api_command(arguments: &[String]) {
+    let Some(subcommand) = arguments.first() else {
+        eprintln!("sync-api requires a subcommand: probe or mutate");
+        std::process::exit(2);
+    };
+
+    match subcommand.as_str() {
+        "probe" => sync_api_probe_command(&arguments[1..]),
+        "mutate" => sync_api_mutate_command(&arguments[1..]),
+        other => {
+            eprintln!("unknown sync-api subcommand: {other}");
+            std::process::exit(2);
+        }
+    }
+}
+
+fn sync_api_probe_command(arguments: &[String]) {
+    let mut base_url = None;
+    let mut controlled = false;
+    let mut json = false;
+    let mut index = 0_usize;
+
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--base-url" => {
+                index += 1;
+                let Some(value) = arguments.get(index) else {
+                    eprintln!("--base-url requires a value");
+                    std::process::exit(2);
+                };
+                base_url = Some(value.clone());
+            }
+            "--controlled" => controlled = true,
+            "--json" => json = true,
+            unknown => {
+                eprintln!("unknown sync-api probe option: {unknown}");
+                std::process::exit(2);
+            }
+        }
+        index += 1;
+    }
+
+    if !controlled {
+        eprintln!("sync API live probing is Controlled-class; rerun with explicit --controlled");
+        std::process::exit(6);
+    }
+
+    let Some(base_url) = base_url else {
+        eprintln!("sync-api probe requires --base-url http://127.0.0.1:PORT");
+        std::process::exit(2);
+    };
+
+    let report = match run_sync_api_probe(&base_url) {
+        Ok(report) => report,
+        Err(error) => {
+            eprintln!("sync API probe failed: {error}");
+            std::process::exit(3);
+        }
+    };
+
+    if json {
+        print!("{}", report.to_json_pretty());
+    } else {
+        println!("DragonForge Password Manager sync API probe");
+        println!("Endpoint: {}", report.endpoint);
+        println!("Protocol: {}", report.protocol_version);
+        for case in &report.cases {
+            println!(
+                "{}  status={}  {}",
+                case.id,
+                case.status.map_or_else(|| "none".to_owned(), |value| value.to_string()),
+                if case.passed { "pass" } else { "fail" }
+            );
+        }
+    }
+
+    if !report.all_expected() {
+        std::process::exit(1);
+    }
+}
+
+fn sync_api_mutate_command(arguments: &[String]) {
+    let mut input = None;
+    let mut output = None;
+    let mut controlled = false;
+    let mut json = false;
+    let mut index = 0_usize;
+
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--input" => {
+                index += 1;
+                let Some(path) = arguments.get(index) else {
+                    eprintln!("--input requires a path");
+                    std::process::exit(2);
+                };
+                input = Some(PathBuf::from(path));
+            }
+            "--output" => {
+                index += 1;
+                let Some(path) = arguments.get(index) else {
+                    eprintln!("--output requires a path");
+                    std::process::exit(2);
+                };
+                output = Some(PathBuf::from(path));
+            }
+            "--controlled" => controlled = true,
+            "--json" => json = true,
+            unknown => {
+                eprintln!("unknown sync-api mutate option: {unknown}");
+                std::process::exit(2);
+            }
+        }
+        index += 1;
+    }
+
+    if !controlled {
+        eprintln!("sync API request mutation is Controlled-class; rerun with explicit --controlled");
+        std::process::exit(6);
+    }
+
+    let Some(input) = input else {
+        eprintln!("sync-api mutate requires --input PATH");
+        std::process::exit(2);
+    };
+    let Some(output) = output else {
+        eprintln!("sync-api mutate requires --output PATH");
+        std::process::exit(2);
+    };
+
+    let corpus = match generate_sync_request_mutations(&input, &output) {
+        Ok(corpus) => corpus,
+        Err(error) => {
+            eprintln!("sync API request mutation failed: {error}");
+            std::process::exit(3);
+        }
+    };
+
+    if json {
+        print!("{}", corpus.to_json_pretty());
+    } else {
+        println!("DragonForge sync API request mutation corpus");
+        println!("Cases: {}", corpus.cases.len());
+        println!("Output: {}", output.display());
+        println!("Manifest: {}", output.join("SHA256SUMS").display());
+    }
+}
+
 fn help() {
     println!("DragonForge Security Test Lab");
     println!();
     println!("Usage: dfstl <command>");
     println!();
     println!("Commands:");
-    println!("  describe                         Show the Phase 6 runtime model");
+    println!("  describe                         Show the Phase 7 runtime model");
     println!("  list                             List registered built-in tests");
     println!("  run [--output PATH] [--controlled] [--lab-ack]");
     println!(
@@ -741,6 +901,10 @@ fn help() {
     println!("  filesystem path-corpus           Emit deterministic Windows path-policy cases");
     println!("  filesystem lab --root PATH       Run disposable reparse/TOCTOU lab");
     println!("    --lab-ack [--json]");
+    println!("  sync-api probe --base-url URL    Probe explicit local Password Manager sync API");
+    println!("    --controlled [--json]");
+    println!("  sync-api mutate --input PATH     Generate offline captured-request mutations");
+    println!("    --output PATH --controlled [--json]");
     println!("  version                          Show the CLI version");
     println!("  help                 Show this help");
 }
@@ -937,6 +1101,34 @@ impl SecurityTest for FilesystemLabSelfCheck {
 
         Ok(TestExecution::pass(
             "disposable filesystem reparse/TOCTOU lab is explicitly authorized",
+        ))
+    }
+}
+
+struct SyncApiHarnessSelfCheck;
+
+impl SecurityTest for SyncApiHarnessSelfCheck {
+    fn descriptor(&self) -> &TestDescriptor {
+        static DESCRIPTOR: TestDescriptor = TestDescriptor::new(
+            "API-SYNC-001",
+            "Password Manager sync API attack harness capability",
+            TestCategory::NetworkApi,
+            SafetyClass::Controlled,
+            ExecutionModel::BlackBox,
+        );
+        &DESCRIPTOR
+    }
+
+    fn execute(&self, context: &TestContext<'_>) -> Result<TestExecution, String> {
+        if !context.policy.allows(SafetyClass::Controlled) {
+            return Ok(TestExecution::new(
+                dfstl_core::TestStatus::Fail,
+                "Controlled sync API harness executed without Controlled policy",
+            ));
+        }
+
+        Ok(TestExecution::pass(
+            "bounded loopback sync API attack harness is authorized",
         ))
     }
 }
