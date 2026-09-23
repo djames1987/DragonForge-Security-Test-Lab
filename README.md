@@ -6,7 +6,7 @@ DFSTL is intentionally maintained as a separate project from the product it test
 
 ## Project status
 
-**Phase 6 — Filesystem, Reparse-Point, and TOCTOU Lab: Implementation Complete — Verification Pending**
+**Phase 6 — Filesystem, Reparse-Point, and TOCTOU Lab: Verified Complete**
 
 Phases 0 through 5 are verified complete. Phase 6 adds a LabOnly disposable filesystem harness for Windows path policy, staging containment, hard links, reparse links, destination races, and source-replacement TOCTOU behavior.
 
@@ -82,7 +82,7 @@ See [SAFETY.md](SAFETY.md) and [docs/TEST_TAXONOMY.md](docs/TEST_TAXONOMY.md).
 - Phase 3 — Static, dependency, supply-chain, and secret scanning: **Verified Complete**
 - Phase 4 — Encrypted-format adversarial testing: **Verified Complete**
 - Phase 5 — DragonForge Agent attack harness: **Verified Complete**
-- Phase 6 — Filesystem, reparse-point, and TOCTOU laboratory: **Implementation Complete — Verification Pending**
+- Phase 6 — Filesystem, reparse-point, and TOCTOU laboratory: **Verified Complete**
 - Phase 7 — Password Manager sync/API attack harness
 - Phase 8 — Fuzzing and security-regression corpus
 - Phase 9 — Secret-leak and memory-lifecycle testing
