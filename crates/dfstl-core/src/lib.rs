@@ -4,6 +4,7 @@ pub mod evidence;
 pub mod hash;
 pub mod model;
 pub mod runner;
+pub mod static_scan;
 pub mod target;
 
 pub use evidence::{EvidenceError, EvidenceLimits, EvidenceSession};
@@ -14,6 +15,11 @@ pub use model::{
 pub use runner::{
     Artifact, CompletedRun, RunCounts, RunReport, Runner, SecurityTest, TestContext, TestExecution,
     TestRecord, TestRegistry,
+};
+pub use static_scan::{
+    DependencyRecord, ExternalScanResults, ExternalToolResult, ExternalToolStatus, FindingSeverity,
+    ScanCounts, StaticFinding, StaticScanError, StaticScanReport, dependency_inventory_json,
+    run_external_scanners, scan_source, spdx_json, write_scan_bundle,
 };
 pub use target::{
     BuildInfo, EXPECTED_EXECUTABLES, PackageManifestStatus, TargetError, TargetExecutable,
