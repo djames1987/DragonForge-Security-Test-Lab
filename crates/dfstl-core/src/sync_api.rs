@@ -728,12 +728,15 @@ fn json_escape(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::io::{Read, Write};
+    use std::net::{Ipv4Addr, TcpListener};
     use std::path::PathBuf;
+    use std::thread;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::{
         generate_sync_request_mutations, parse_capture, parse_loopback_base_url,
-        SYNC_PROTOCOL_VERSION,
+        run_sync_api_probe, SYNC_PROTOCOL_VERSION,
     };
 
     fn temp_path(label: &str) -> PathBuf {
@@ -761,6 +764,103 @@ mod tests {
     #[test]
     fn capture_parser_rejects_malformed_requests() {
         assert!(parse_capture(b"not-http").is_err());
+    }
+
+
+    #[test]
+    fn loopback_probe_exercises_non_state_changing_matrix() {
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).expect("listener");
+        let port = listener.local_addr().expect("address").port();
+
+        let handle = thread::spawn(move || {
+            for _ in 0..8 {
+                let (mut stream, _) = listener.accept().expect("accept");
+                let mut bytes = Vec::new();
+                let mut buffer = [0_u8; 4096];
+                let header_end = loop {
+                    let count = stream.read(&mut buffer).expect("read");
+                    if count == 0 {
+                        break None;
+                    }
+                    bytes.extend_from_slice(&buffer[..count]);
+                    if let Some(index) = super::find_bytes(&bytes, b"\r\n\r\n") {
+                        break Some(index);
+                    }
+                };
+                let Some(header_end) = header_end else {
+                    continue;
+                };
+
+                let head = String::from_utf8_lossy(&bytes[..header_end]);
+                let request_line = head.lines().next().unwrap_or_default().to_owned();
+                let content_length = head
+                    .lines()
+                    .find_map(|line| {
+                        let (name, value) = line.split_once(':')?;
+                        if name.eq_ignore_ascii_case("content-length") {
+                            value.trim().parse::<usize>().ok()
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or(0);
+
+                let body_start = header_end + 4;
+                while bytes.len().saturating_sub(body_start) < content_length {
+                    let count = stream.read(&mut buffer).expect("read body");
+                    if count == 0 {
+                        break;
+                    }
+                    bytes.extend_from_slice(&buffer[..count]);
+                }
+
+                let status = if request_line.starts_with("GET /v1/health ") {
+                    200
+                } else if request_line.starts_with("GET /v1/devices ") {
+                    401
+                } else if request_line.starts_with("POST /v1/accounts ") {
+                    403
+                } else if request_line.starts_with("GET /v1/does-not-exist ") {
+                    404
+                } else if request_line.starts_with("POST /v1/health ") {
+                    405
+                } else if request_line.starts_with("POST /v1/recovery/begin ")
+                    && content_length > super::LIVE_OVERSIZE_BYTES
+                {
+                    413
+                } else {
+                    422
+                };
+
+                let reason = match status {
+                    200 => "OK",
+                    401 => "Unauthorized",
+                    403 => "Forbidden",
+                    404 => "Not Found",
+                    405 => "Method Not Allowed",
+                    413 => "Content Too Large",
+                    _ => "Unprocessable Entity",
+                };
+                let extra = if status == 200 {
+                    concat!(
+                        "Cache-Control: no-store\r\n",
+                        "X-Content-Type-Options: nosniff\r\n",
+                        "Referrer-Policy: no-referrer\r\n"
+                    )
+                } else {
+                    ""
+                };
+                let response = format!(
+                    "HTTP/1.1 {status} {reason}\r\n{extra}Content-Length: 0\r\nConnection: close\r\n\r\n"
+                );
+                stream.write_all(response.as_bytes()).expect("response");
+            }
+        });
+
+        let report = run_sync_api_probe(&format!("http://127.0.0.1:{port}")).expect("probe");
+        assert!(report.all_expected());
+        assert_eq!(report.cases.len(), 8);
+        handle.join().expect("server");
     }
 
     #[test]
