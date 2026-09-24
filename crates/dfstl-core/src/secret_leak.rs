@@ -1,7 +1,7 @@
 use std::fmt;
 use std::fmt::Write as _;
 use std::fs;
-use std::io;
+use std::io::{self, BufReader, Read};
 use std::path::{Path, PathBuf};
 
 use crate::hash::{hex_digest, sha256_bytes};
@@ -11,6 +11,7 @@ pub const MAX_SENTINEL_BYTES: usize = 512;
 pub const MAX_SCAN_FILES: usize = 4096;
 pub const MAX_FILE_SCAN_BYTES: usize = 16 * 1024 * 1024;
 pub const MAX_TOTAL_SCAN_BYTES: usize = 256 * 1024 * 1024;
+pub const MAX_DUMP_SCAN_BYTES: u64 = 512 * 1024 * 1024;
 
 #[derive(Debug)]
 pub enum SecretLeakError {
@@ -19,6 +20,7 @@ pub enum SecretLeakError {
     InvalidSentinelId(usize),
     InvalidSentinelLength(usize),
     TooManySentinels,
+    NoSentinels,
     RootMissing(PathBuf),
     RootIsSymlink(PathBuf),
     ScanLimitExceeded,
@@ -35,6 +37,7 @@ impl fmt::Display for SecretLeakError {
                 write!(f, "invalid sentinel value length on line {line}")
             }
             Self::TooManySentinels => f.write_str("too many synthetic sentinel definitions"),
+            Self::NoSentinels => f.write_str("no synthetic sentinel definitions were provided"),
             Self::RootMissing(path) => write!(f, "scan root does not exist: {}", path.display()),
             Self::RootIsSymlink(path) => {
                 write!(f, "scan root must not be a symlink: {}", path.display())
@@ -209,13 +212,16 @@ pub fn load_sentinels(path: &Path) -> Result<Vec<SecretSentinel>, SecretLeakErro
         {
             return Err(SecretLeakError::InvalidSentinelId(line_number));
         }
-        if value.len() < 12 || value.len() > MAX_SENTINEL_BYTES {
+        if value.len() < 12 || value.len() > MAX_SENTINEL_BYTES || !value.is_ascii() {
             return Err(SecretLeakError::InvalidSentinelLength(line_number));
         }
         sentinels.push(SecretSentinel {
             id: id.to_owned(),
             value: value.as_bytes().to_vec(),
         });
+    }
+    if sentinels.is_empty() {
+        return Err(SecretLeakError::NoSentinels);
     }
     Ok(sentinels)
 }
@@ -246,7 +252,14 @@ pub fn scan_artifact_roots(
         if metadata.is_file() {
             scan_one_file(root, root, sentinels, &mut state)?;
         } else if metadata.is_dir() {
-            scan_directory(root, root, sentinels, &mut state)?;
+            let canonical_root = fs::canonicalize(root)?;
+            scan_directory(
+                root,
+                &canonical_root,
+                root,
+                sentinels,
+                &mut state,
+            )?;
         }
     }
     Ok(state.finish())
@@ -274,8 +287,12 @@ pub fn scan_process_dump(
         return Err(SecretLeakError::RootIsSymlink(dump_path.to_path_buf()));
     }
 
+    if metadata.len() > MAX_DUMP_SCAN_BYTES {
+        return Err(SecretLeakError::ScanLimitExceeded);
+    }
+
     let mut state = ScanState::new("process-dump", 1);
-    scan_one_file(dump_path, dump_path, sentinels, &mut state)?;
+    scan_dump_file(dump_path, sentinels, &mut state)?;
     Ok(state.finish())
 }
 
@@ -319,10 +336,20 @@ pub fn synthetic_memory_lifecycle_check() -> bool {
 
 fn scan_directory(
     root: &Path,
+    canonical_root: &Path,
     current: &Path,
     sentinels: &[SecretSentinel],
     state: &mut ScanState,
 ) -> Result<(), SecretLeakError> {
+    let canonical_current = fs::canonicalize(current)?;
+    if !canonical_current.starts_with(canonical_root) {
+        return Ok(());
+    }
+    if state.visited_directories.contains(&canonical_current) {
+        return Ok(());
+    }
+    state.visited_directories.push(canonical_current);
+
     let mut entries = fs::read_dir(current)?.collect::<Result<Vec<_>, _>>()?;
     entries.sort_by_key(std::fs::DirEntry::file_name);
 
@@ -332,12 +359,99 @@ fn scan_directory(
         if metadata.file_type().is_symlink() {
             continue;
         }
+
+        let canonical_path = fs::canonicalize(&path)?;
+        if !canonical_path.starts_with(canonical_root) {
+            continue;
+        }
+
         if metadata.is_dir() {
-            scan_directory(root, &path, sentinels, state)?;
+            scan_directory(root, canonical_root, &path, sentinels, state)?;
         } else if metadata.is_file() {
             scan_one_file(root, &path, sentinels, state)?;
         }
     }
+    Ok(())
+}
+
+fn scan_dump_file(
+    path: &Path,
+    sentinels: &[SecretSentinel],
+    state: &mut ScanState,
+) -> Result<(), SecretLeakError> {
+    const CHUNK_BYTES: usize = 1024 * 1024;
+
+    let file = fs::File::open(path)?;
+    let metadata = file.metadata()?;
+    let variants = sentinels
+        .iter()
+        .flat_map(|sentinel| {
+            sentinel_variants(sentinel)
+                .into_iter()
+                .map(move |variant| (sentinel.id.clone(), variant))
+        })
+        .collect::<Vec<_>>();
+    let max_pattern = variants
+        .iter()
+        .map(|(_, variant)| variant.bytes.len())
+        .max()
+        .unwrap_or(1);
+    let overlap_size = max_pattern.saturating_sub(1);
+    let mut reader = BufReader::new(file);
+    let mut buffer = vec![0_u8; CHUNK_BYTES];
+    let mut overlap = Vec::new();
+    let mut total_read = 0_u64;
+
+    loop {
+        let count = reader.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        let chunk_start = total_read;
+        total_read = total_read.saturating_add(u64::try_from(count).unwrap_or(u64::MAX));
+        if total_read > MAX_DUMP_SCAN_BYTES {
+            return Err(SecretLeakError::ScanLimitExceeded);
+        }
+
+        let mut window = Vec::with_capacity(overlap.len() + count);
+        window.extend_from_slice(&overlap);
+        window.extend_from_slice(&buffer[..count]);
+        let base_offset = chunk_start.saturating_sub(
+            u64::try_from(overlap.len()).unwrap_or(u64::MAX),
+        );
+
+        for (sentinel_id, variant) in &variants {
+            for offset in find_all(&window, &variant.bytes) {
+                let absolute = base_offset.saturating_add(
+                    u64::try_from(offset).unwrap_or(u64::MAX),
+                );
+                if absolute.saturating_add(
+                    u64::try_from(variant.bytes.len()).unwrap_or(u64::MAX),
+                ) <= chunk_start
+                {
+                    continue;
+                }
+                state.findings.push(LeakFinding {
+                    sentinel_id: sentinel_id.clone(),
+                    relative_path: path
+                        .file_name()
+                        .map_or_else(
+                            || "process.dmp".to_owned(),
+                            |name| name.to_string_lossy().into_owned(),
+                        ),
+                    representation: variant.label.to_owned(),
+                    offset: usize::try_from(absolute).unwrap_or(usize::MAX),
+                });
+            }
+        }
+
+        let keep = overlap_size.min(window.len());
+        overlap.clear();
+        overlap.extend_from_slice(&window[window.len() - keep..]);
+    }
+
+    state.files_scanned = 1;
+    state.bytes_scanned = metadata.len();
     Ok(())
 }
 
@@ -401,7 +515,7 @@ struct SentinelVariant {
     bytes: Vec<u8>,
 }
 
-fn sentinel_variants(sentinel: &SecretSentinel) -> [SentinelVariant; 3] {
+fn sentinel_variants(sentinel: &SecretSentinel) -> [SentinelVariant; 4] {
     [
         SentinelVariant {
             label: "raw",
@@ -415,7 +529,20 @@ fn sentinel_variants(sentinel: &SecretSentinel) -> [SentinelVariant; 3] {
             label: "base64",
             bytes: base64_encode(&sentinel.value).into_bytes(),
         },
+        SentinelVariant {
+            label: "utf16le",
+            bytes: utf16le_ascii(&sentinel.value),
+        },
     ]
+}
+
+fn utf16le_ascii(bytes: &[u8]) -> Vec<u8> {
+    let mut output = Vec::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        output.push(*byte);
+        output.push(0);
+    }
+    output
 }
 
 fn find_all(haystack: &[u8], needle: &[u8]) -> Vec<usize> {
@@ -455,15 +582,23 @@ fn base64_encode(bytes: &[u8]) -> String {
         let third = chunk.get(2).map_or(0, |value| u32::from(*value));
         let value = (first << 16) | (second << 8) | third;
 
-        output.push(char::from(TABLE[((value >> 18) & 0x3f) as usize]));
-        output.push(char::from(TABLE[((value >> 12) & 0x3f) as usize]));
+        output.push(char::from(
+            TABLE[usize::try_from((value >> 18) & 0x3f).unwrap_or(0)],
+        ));
+        output.push(char::from(
+            TABLE[usize::try_from((value >> 12) & 0x3f).unwrap_or(0)],
+        ));
         if chunk.len() > 1 {
-            output.push(char::from(TABLE[((value >> 6) & 0x3f) as usize]));
+            output.push(char::from(
+                TABLE[usize::try_from((value >> 6) & 0x3f).unwrap_or(0)],
+            ));
         } else {
             output.push('=');
         }
         if chunk.len() > 2 {
-            output.push(char::from(TABLE[(value & 0x3f) as usize]));
+            output.push(char::from(
+                TABLE[usize::try_from(value & 0x3f).unwrap_or(0)],
+            ));
         } else {
             output.push('=');
         }
@@ -478,6 +613,7 @@ struct ScanState {
     bytes_scanned: u64,
     skipped_oversized_files: usize,
     findings: Vec<LeakFinding>,
+    visited_directories: Vec<PathBuf>,
 }
 
 impl ScanState {
@@ -489,6 +625,7 @@ impl ScanState {
             bytes_scanned: 0,
             skipped_oversized_files: 0,
             findings: Vec::new(),
+            visited_directories: Vec::new(),
         }
     }
 
