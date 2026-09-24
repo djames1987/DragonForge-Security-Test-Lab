@@ -6,7 +6,7 @@ DFSTL is intentionally maintained as a separate project from the product it test
 
 ## Project status
 
-**Phase 10 — Failure, Crash & Resource Exhaustion Testing: Implementation Complete — Verification Pending**
+**Phase 10 — Failure, Crash & Resource Exhaustion Testing: Verified Complete**
 
 Phases 0 through 9 are verified complete. Phase 10 adds deterministic injected disk/permission failures, interrupted write/restore recovery checks, bounded CPU/memory/loopback socket stress, and LabOnly DFSTL self-child termination.
 
