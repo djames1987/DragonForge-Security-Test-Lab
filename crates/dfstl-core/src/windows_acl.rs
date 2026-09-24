@@ -181,6 +181,9 @@ pub fn analyze_acl_records(records: &[AclRecord]) -> AclAnalysisReport {
                 | "users"
                 | "authenticated users"
                 | "nt authority\\authenticated users"
+                | "s-1-1-0"
+                | "s-1-5-11"
+                | "s-1-5-32-545"
         );
         let allowed = record.access_type == "allow";
         let writable = rights_are_write_capable(&record.rights);
@@ -285,7 +288,9 @@ fn is_sensitive_target(value: &str) -> bool {
 
 fn is_expected_sensitive_principal(value: &str) -> bool {
     value == "nt authority\\system"
+        || value == "s-1-5-18"
         || value == "builtin\\administrators"
+        || value == "s-1-5-32-544"
         || value.starts_with("nt service\\dragonforgeprivilegedservice")
 }
 
