@@ -123,7 +123,7 @@ fn describe() {
     println!("fuzz-minimizer-api: available");
     println!("cargo-fuzz-scaffold: available");
     println!("synthetic-secret-sentinel-scan: available");
-    println!("secret-scan-representations: raw,hex-lower,base64");
+    println!("secret-scan-representations: raw,hex-lower,base64,utf16le");
     println!("secret-artifact-scan-safety-class: controlled");
     println!("process-dump-scan: offline-only");
     println!("process-dump-scan-safety-class: lab-only");
