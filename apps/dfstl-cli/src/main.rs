@@ -8,11 +8,10 @@ use dfstl_core::{
     ExecutionPolicy, ExternalToolStatus, FuzzTarget, PackageManifestStatus, Runner, SafetyClass,
     SecurityTest, TargetError, TestCategory, TestContext, TestDescriptor, TestExecution,
     TestRegistry, generate_fuzz_corpus, generate_mutation_corpus, generate_runtime_mutation_corpus,
-    generate_sync_request_mutations, inspect_target, path_policy_corpus,
-    load_sentinels, promote_regression_fixture, resolve_target, run_agent_attack_harness,
-    run_external_scanners, run_filesystem_lab, run_sync_api_probe, scan_artifact_roots,
-    scan_process_dump, scan_source, synthetic_memory_lifecycle_check, write_scan_bundle,
-    write_secret_leak_bundle,
+    generate_sync_request_mutations, inspect_target, load_sentinels, path_policy_corpus,
+    promote_regression_fixture, resolve_target, run_agent_attack_harness, run_external_scanners,
+    run_filesystem_lab, run_sync_api_probe, scan_artifact_roots, scan_process_dump, scan_source,
+    synthetic_memory_lifecycle_check, write_scan_bundle, write_secret_leak_bundle,
 };
 
 fn main() {
@@ -1114,7 +1113,6 @@ fn fuzz_promote_command(arguments: &[String]) {
         println!("SHA-256: {}", fixture.sha256);
     }
 }
-
 
 fn secret_leak_command(arguments: &[String]) {
     let Some(subcommand) = arguments.first() else {
