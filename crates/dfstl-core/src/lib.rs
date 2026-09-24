@@ -3,8 +3,8 @@
 pub mod agent_harness;
 pub mod encrypted_formats;
 pub mod evidence;
-pub mod filesystem_lab;
 pub mod failure_lab;
+pub mod filesystem_lab;
 pub mod fuzzing;
 pub mod hash;
 pub mod model;
