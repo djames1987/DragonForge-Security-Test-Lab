@@ -41,6 +41,11 @@ pub use static_scan::{
     ScanCounts, StaticFinding, StaticScanError, StaticScanReport, dependency_inventory_json,
     run_external_scanners, scan_source, spdx_json, write_scan_bundle,
 };
+pub use sync_api::{
+    MAX_CAPTURE_BYTES, RequestMutationCase, RequestMutationCorpus, SYNC_BLOB_BYTES,
+    SYNC_PROTOCOL_VERSION, SYNC_REQUEST_LIMIT_BYTES, SyncApiError, SyncApiProbeReport,
+    generate_sync_request_mutations, run_sync_api_probe,
+};
 pub use target::{
     BuildInfo, EXPECTED_EXECUTABLES, PackageManifestStatus, TargetError, TargetExecutable,
     TargetInspection, discover_candidates, inspect_target, resolve_target,
