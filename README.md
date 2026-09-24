@@ -6,7 +6,7 @@ DFSTL is intentionally maintained as a separate project from the product it test
 
 ## Project status
 
-**Phase 9 — Secret Leak & Memory Security Testing: Implementation Complete — Verification Pending**
+**Phase 9 — Secret Leak & Memory Security Testing: Verified Complete**
 
 Phases 0 through 8 are verified complete. Phase 9 adds synthetic sentinel leak scanning for explicit diagnostic/AppData/temp/support roots, redaction-safe evidence, controlled in-place lifecycle checks, and LabOnly offline process-dump analysis.
 
@@ -91,7 +91,7 @@ See [SAFETY.md](SAFETY.md) and [docs/TEST_TAXONOMY.md](docs/TEST_TAXONOMY.md).
 - Phase 6 — Filesystem, reparse-point, and TOCTOU laboratory: **Verified Complete**
 - Phase 7 — Password Manager sync/API attack harness: **Verified Complete**
 - Phase 8 — Fuzzing and security-regression corpus
-- Phase 9 — Secret-leak and memory-lifecycle testing: **Implementation Complete — Verification Pending**
+- Phase 9 — Secret-leak and memory-lifecycle testing: **Verified Complete**
 - Phase 10 — Failure injection and resource-exhaustion testing
 - Phase 11 — Windows multi-user and ACL security testing
 - Phase 12 — VM and multi-machine orchestration
