@@ -205,10 +205,12 @@ pub fn analyze_acl_records(records: &[AclRecord]) -> AclAnalysisReport {
             });
         }
 
+        let owner = normalize_principal(&record.owner);
         if is_sensitive_target(&record.target)
             && record.inherited
             && allowed
             && writable
+            && principal != owner
             && !is_expected_sensitive_principal(&principal)
         {
             findings.push(AclFinding {
