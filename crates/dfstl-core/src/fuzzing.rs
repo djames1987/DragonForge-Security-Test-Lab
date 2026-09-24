@@ -82,7 +82,7 @@ impl FuzzTarget {
     /// # Errors
     ///
     /// Returns InvalidTarget for unknown names.
-    pub fn parse(value: &str) -> Result<Self, FuzzError> {
+    pub fn from_name(value: &str) -> Result<Self, FuzzError> {
         match value {
             "dfvault" => Ok(Self::DfVault),
             "dfbackup" => Ok(Self::DfBackup),
@@ -695,7 +695,7 @@ mod tests {
     #[test]
     fn all_fuzz_targets_parse_and_generate_structure_cases() {
         for target in FuzzTarget::all() {
-            assert_eq!(FuzzTarget::parse(target.as_str()).expect("parse"), target);
+            assert_eq!(FuzzTarget::from_name(target.as_str()).expect("parse"), target);
         }
     }
 
