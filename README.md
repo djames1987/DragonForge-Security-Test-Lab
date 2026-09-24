@@ -134,7 +134,7 @@ Run the full Phase 11 verifier from an **elevated Windows PowerShell** session:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-phase11-tests.ps1 -Release
 ```
 
-The verifier creates one temporary non-admin local account, applies explicit ACLs to a disposable DragonForge-shaped lab under `C:\Users\Public`, performs real cross-user read/write probes, captures an ACL snapshot, validates an intentionally unsafe inherited ACL fixture, and removes the temporary account/lab state during cleanup.
+The verifier creates two temporary non-admin local accounts (owner and cross-user), applies explicit ACLs to a disposable DragonForge-shaped lab under `C:\Users\Public`, performs real cross-user read/write probes, captures an ACL snapshot, validates an intentionally unsafe inherited ACL fixture, and removes the temporary account/lab state during cleanup.
 
 Offline ACL evidence can be analyzed with:
 
