@@ -4,6 +4,7 @@ pub mod agent_harness;
 pub mod encrypted_formats;
 pub mod evidence;
 pub mod filesystem_lab;
+pub mod fuzzing;
 pub mod hash;
 pub mod model;
 pub mod runner;
@@ -27,6 +28,11 @@ pub use evidence::{EvidenceError, EvidenceLimits, EvidenceSession};
 pub use filesystem_lab::{
     FilesystemLabError, FilesystemLabReport, LabCase, LabCaseStatus, MAX_LAB_CASES, PathCorpusCase,
     PathCorpusReport, path_policy_corpus, run_filesystem_lab, validate_windows_relative_path,
+};
+pub use fuzzing::{
+    DEFAULT_FUZZ_CASES, FuzzCase, FuzzCorpus, FuzzError, FuzzTarget, MAX_FUZZ_CASES,
+    MAX_FUZZ_SEED_BYTES, RegressionFixture, exercise_fuzz_input, generate_fuzz_corpus,
+    minimize_with_oracle, promote_regression_fixture,
 };
 pub use hash::{Sha256, hex_digest, sha256_bytes, sha256_file};
 pub use model::{
