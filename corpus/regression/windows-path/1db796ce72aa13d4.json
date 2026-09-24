@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "target": "windows-path",
+  "filename": "1db796ce72aa13d4.bin",
+  "sha256": "1db796ce72aa13d42af362173aea63b7c6cba5ba65f1ccad1898563c15fb401b",
+  "source_name": "phase8-synthetic-windows-path",
+  "note": "Permanent regression for traversal plus Windows reserved-device-name rejection."
+}
