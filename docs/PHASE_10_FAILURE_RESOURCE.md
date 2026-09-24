@@ -2,7 +2,7 @@
 
 ## Status
 
-**Implementation Complete — Verification Pending**
+**Verified Complete**
 
 Phase 10 adds deterministic fault injection, recovery-consistency checks, bounded CPU/memory/loopback-socket stress, and a self-child-only process termination harness.
 
@@ -226,13 +226,44 @@ The validator checks:
 - Safe/Controlled/LabOnly runner policy behavior;
 - release build.
 
-## Exit criteria
+## Verification record
 
-Phase 10 is verified when validation ends with:
+Phase 10 was locally verified on Windows on 2026-09-23 against commit:
 
 ```text
-Warnings: 0
-Failures: 0
+47653dbadc1d24e0440f82630a147b0138667898
+```
 
-PHASE 10 VALIDATION: PASS
+The release-mode validation completed with:
+
+- a clean `main` branch;
+- rustfmt passing;
+- strict Clippy passing with warnings denied;
+- 65 debug tests passing;
+- 65 release tests passing;
+- deterministic failure-injection regression passing;
+- bounded resource-stress regression passing;
+- failure-evidence manifest regression passing;
+- a fresh Phase 10 release CLI build succeeding;
+- Phase 10 capability markers and FAULT/RESOURCE registrations confirmed;
+- Controlled failure-injection refusal without `--controlled`;
+- LabOnly resource-stress refusal without `--lab-ack`;
+- LabOnly self-child termination refusal without `--lab-ack`;
+- all four deterministic failure cases passing;
+- committed atomic state preserved and stale staging removed;
+- interrupted restore destination preserved and partial staging removed;
+- over-budget resource requests failing closed without evidence creation;
+- bounded CPU/memory/loopback-socket stress passing with SHA-256 evidence;
+- self-child process termination completing successfully;
+- Safe runner skipping all Phase 10 higher-safety tests;
+- Controlled runner passing failure injection while keeping LabOnly resource/kill tests skipped;
+- LabOnly runner passing all 14 registered tests;
+- release workspace build succeeding;
+- zero warnings and zero failures.
+
+Validation evidence:
+
+```text
+phase10-validation-20260923-224100.log
+SHA-256: A3EF9C4C23B10959221A600FD27515F09BC7EEA221DAD9C3658F08DAD06C3E47
 ```
