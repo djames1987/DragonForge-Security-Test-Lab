@@ -13,3 +13,7 @@ Thumbs.db
 !.env.example
 
 /test-logs/
+
+/fuzz/artifacts/
+/fuzz/corpus/
+/fuzz/target/
