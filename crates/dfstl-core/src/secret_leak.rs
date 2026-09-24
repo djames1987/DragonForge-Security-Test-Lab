@@ -8,6 +8,7 @@ use crate::hash::{hex_digest, sha256_bytes};
 
 pub const MAX_SENTINELS: usize = 64;
 pub const MAX_SENTINEL_BYTES: usize = 512;
+pub const MAX_SENTINEL_FILE_BYTES: usize = 64 * 1024;
 pub const MAX_SCAN_FILES: usize = 4096;
 pub const MAX_FILE_SCAN_BYTES: usize = 16 * 1024 * 1024;
 pub const MAX_TOTAL_SCAN_BYTES: usize = 256 * 1024 * 1024;
@@ -19,6 +20,7 @@ pub enum SecretLeakError {
     InvalidSentinelLine(usize),
     InvalidSentinelId(usize),
     InvalidSentinelLength(usize),
+    InvalidSentinelEncoding,
     TooManySentinels,
     NoSentinels,
     RootMissing(PathBuf),
@@ -38,6 +40,9 @@ impl fmt::Display for SecretLeakError {
             Self::InvalidSentinelId(line) => write!(f, "invalid sentinel ID on line {line}"),
             Self::InvalidSentinelLength(line) => {
                 write!(f, "invalid sentinel value length on line {line}")
+            }
+            Self::InvalidSentinelEncoding => {
+                f.write_str("synthetic sentinel file must contain UTF-8 text")
             }
             Self::TooManySentinels => f.write_str("too many synthetic sentinel definitions"),
             Self::NoSentinels => f.write_str("no synthetic sentinel definitions were provided"),
@@ -196,9 +201,14 @@ impl SecretLeakReport {
 ///
 /// Returns an error for malformed definitions or I/O failures.
 pub fn load_sentinels(path: &Path) -> Result<Vec<SecretSentinel>, SecretLeakError> {
-    let content = fs::read_to_string(path)?;
+    let content = SensitiveBytes(fs::read(path)?);
+    if content.0.len() > MAX_SENTINEL_FILE_BYTES {
+        return Err(SecretLeakError::ScanLimitExceeded);
+    }
+    let text =
+        std::str::from_utf8(&content.0).map_err(|_| SecretLeakError::InvalidSentinelEncoding)?;
     let mut sentinels = Vec::new();
-    for (index, raw_line) in content.lines().enumerate() {
+    for (index, raw_line) in text.lines().enumerate() {
         let line_number = index + 1;
         let line = raw_line.trim();
         if line.is_empty() || line.starts_with('#') {
@@ -519,9 +529,23 @@ fn scan_one_file(
     Ok(())
 }
 
+struct SensitiveBytes(Vec<u8>);
+
+impl Drop for SensitiveBytes {
+    fn drop(&mut self) {
+        self.0.fill(0);
+    }
+}
+
 struct SentinelVariant {
     label: &'static str,
     bytes: Vec<u8>,
+}
+
+impl Drop for SentinelVariant {
+    fn drop(&mut self) {
+        self.bytes.fill(0);
+    }
 }
 
 fn sentinel_variants(sentinel: &SecretSentinel) -> [SentinelVariant; 4] {
