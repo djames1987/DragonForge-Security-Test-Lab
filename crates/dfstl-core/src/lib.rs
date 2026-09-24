@@ -45,7 +45,8 @@ pub use runner::{
 };
 pub use secret_leak::{
     LeakFinding, MAX_FILE_SCAN_BYTES, MAX_SCAN_FILES, MAX_SENTINELS, MAX_SENTINEL_BYTES,
-    MAX_TOTAL_SCAN_BYTES, SecretLeakError, SecretLeakReport, SecretSentinel, load_sentinels,
+    MAX_SENTINEL_FILE_BYTES, MAX_TOTAL_SCAN_BYTES, SecretLeakError, SecretLeakReport,
+    SecretSentinel, load_sentinels,
     scan_artifact_roots, scan_process_dump, synthetic_memory_lifecycle_check,
     write_secret_leak_bundle,
 };
