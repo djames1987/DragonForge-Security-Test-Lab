@@ -204,7 +204,10 @@ pub fn run_bounded_resource_stress(
         *byte = u8::try_from(index % 251).unwrap_or(0);
     }
     let memory_checksum = sha256_bytes(&memory);
-    checksum = sha256_bytes(&[checksum.as_slice(), memory_checksum.as_slice()].concat());
+    let mut combined = [0_u8; 64];
+    combined[..32].copy_from_slice(&checksum);
+    combined[32..].copy_from_slice(&memory_checksum);
+    checksum = sha256_bytes(&combined);
 
     run_socket_stress(socket_connections)?;
 
@@ -341,27 +344,55 @@ fn recover_interrupted_write(destination: &Path, staging: &Path) -> Result<(), F
 fn run_socket_stress(connections: usize) -> Result<(), FailureLabError> {
     let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?;
     let address = listener.local_addr()?;
-    listener.set_nonblocking(false)?;
+    listener.set_nonblocking(true)?;
 
     let server = thread::spawn(move || -> io::Result<usize> {
+        let deadline = Instant::now() + Duration::from_secs(5);
         let mut accepted = 0_usize;
-        for _ in 0..connections {
-            let (mut stream, _) = listener.accept()?;
-            let mut byte = [0_u8; 1];
-            std::io::Read::read_exact(&mut stream, &mut byte)?;
-            accepted += 1;
+        while accepted < connections {
+            match listener.accept() {
+                Ok((mut stream, _)) => {
+                    let mut byte = [0_u8; 1];
+                    std::io::Read::read_exact(&mut stream, &mut byte)?;
+                    accepted += 1;
+                }
+                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                    if Instant::now() >= deadline {
+                        return Err(io::Error::new(
+                            io::ErrorKind::TimedOut,
+                            "loopback socket stress accept deadline exceeded",
+                        ));
+                    }
+                    thread::sleep(Duration::from_millis(2));
+                }
+                Err(error) => return Err(error),
+            }
         }
         Ok(accepted)
     });
 
+    let mut client_error = None;
     for _ in 0..connections {
-        let mut stream = TcpStream::connect_timeout(&address, Duration::from_secs(2))?;
-        stream.write_all(&[0x5a])?;
+        match TcpStream::connect_timeout(&address, Duration::from_secs(2)) {
+            Ok(mut stream) => {
+                if let Err(error) = stream.write_all(&[0x5a]) {
+                    client_error = Some(error);
+                    break;
+                }
+            }
+            Err(error) => {
+                client_error = Some(error);
+                break;
+            }
+        }
     }
 
     let accepted = server
         .join()
         .map_err(|_| io::Error::other("socket stress worker panicked"))??;
+    if let Some(error) = client_error {
+        return Err(FailureLabError::Io(error));
+    }
     if accepted != connections {
         return Err(FailureLabError::RecoveryInvariant(
             "loopback socket stress accepted unexpected connection count".to_owned(),
