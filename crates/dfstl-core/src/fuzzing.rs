@@ -355,6 +355,90 @@ pub fn promote_regression_fixture(
     Ok(fixture)
 }
 
+/// Exercises arbitrary bytes through the target's structure-aware parser surface.
+///
+/// This function is side-effect free and intended for cargo-fuzz targets.
+#[must_use]
+pub fn exercise_fuzz_input(target: FuzzTarget, data: &[u8]) -> u64 {
+    match target {
+        FuzzTarget::WindowsPath => std::str::from_utf8(data).map_or(0, |value| {
+            u64::from(crate::filesystem_lab::validate_windows_relative_path(value).is_ok())
+        }),
+        FuzzTarget::SyncHttp => exercise_http_shape(data),
+        FuzzTarget::AgentJson | FuzzTarget::PasswordManagerJson => exercise_json_shape(data),
+        FuzzTarget::DfVault
+        | FuzzTarget::DfBackup
+        | FuzzTarget::DfShare
+        | FuzzTarget::DfAuth => exercise_binary_shape(data),
+    }
+}
+
+fn exercise_binary_shape(data: &[u8]) -> u64 {
+    let prefix = data.get(..8).unwrap_or(data);
+    let mut score = u64::try_from(prefix.len()).unwrap_or(0);
+    for byte in prefix {
+        score = score.rotate_left(5) ^ u64::from(*byte);
+    }
+    if let Some(version) = data.get(4..8) {
+        let mut raw = [0_u8; 4];
+        raw.copy_from_slice(version);
+        score ^= u64::from(u32::from_le_bytes(raw));
+    }
+    score
+}
+
+fn exercise_json_shape(data: &[u8]) -> u64 {
+    let Ok(text) = std::str::from_utf8(data) else {
+        return 0;
+    };
+    let mut depth = 0_i64;
+    let mut in_string = false;
+    let mut escaped = false;
+    for character in text.chars() {
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if character == '\\' {
+                escaped = true;
+            } else if character == '"' {
+                in_string = false;
+            }
+            continue;
+        }
+        match character {
+            '"' => in_string = true,
+            '{' | '[' => depth = depth.saturating_add(1),
+            '}' | ']' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+    }
+    u64::from(in_string) ^ depth.unsigned_abs()
+}
+
+fn exercise_http_shape(data: &[u8]) -> u64 {
+    let Some(boundary) = find_bytes(data, b"\r\n\r\n") else {
+        return 0;
+    };
+    let Ok(head) = std::str::from_utf8(&data[..boundary]) else {
+        return 1;
+    };
+    let mut score = u64::try_from(head.lines().count()).unwrap_or(u64::MAX);
+    for line in head.lines() {
+        if let Some((name, value)) = line.split_once(':') {
+            score = score.wrapping_add(
+                u64::try_from(name.trim().len() + value.trim().len()).unwrap_or(u64::MAX),
+            );
+        }
+    }
+    score ^ u64::try_from(data.len().saturating_sub(boundary + 4)).unwrap_or(u64::MAX)
+}
+
+fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    haystack
+        .windows(needle.len())
+        .position(|window| window == needle)
+}
+
 fn mutate_case(
     target: FuzzTarget,
     seed: &[u8],
