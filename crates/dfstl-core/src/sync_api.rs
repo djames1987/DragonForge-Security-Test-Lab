@@ -36,7 +36,11 @@ impl fmt::Display for SyncApiError {
             Self::CaptureTooLarge => f.write_str("captured request exceeds the safe size limit"),
             Self::InvalidCapture => f.write_str("captured HTTP request is malformed"),
             Self::OutputExists(path) => {
-                write!(f, "sync API mutation output already exists: {}", path.display())
+                write!(
+                    f,
+                    "sync API mutation output already exists: {}",
+                    path.display()
+                )
             }
         }
     }
@@ -85,11 +89,7 @@ impl SyncApiProbeReport {
         let mut output = String::new();
         let _ = writeln!(output, "{{");
         let _ = writeln!(output, "  \"schema_version\": {},", self.schema_version);
-        let _ = writeln!(
-            output,
-            "  \"protocol_version\": {},",
-            self.protocol_version
-        );
+        let _ = writeln!(output, "  \"protocol_version\": {},", self.protocol_version);
         let _ = writeln!(
             output,
             "  \"endpoint\": \"{}\",",
@@ -98,7 +98,11 @@ impl SyncApiProbeReport {
         let _ = writeln!(output, "  \"all_expected\": {},", self.all_expected());
         let _ = writeln!(output, "  \"cases\": [");
         for (index, case) in self.cases.iter().enumerate() {
-            let comma = if index + 1 == self.cases.len() { "" } else { "," };
+            let comma = if index + 1 == self.cases.len() {
+                ""
+            } else {
+                ","
+            };
             let status = case
                 .status
                 .map_or_else(|| "null".to_owned(), |value| value.to_string());
@@ -143,11 +147,7 @@ impl RequestMutationCorpus {
         let mut output = String::new();
         let _ = writeln!(output, "{{");
         let _ = writeln!(output, "  \"schema_version\": {},", self.schema_version);
-        let _ = writeln!(
-            output,
-            "  \"source_sha256\": \"{}\",",
-            self.source_sha256
-        );
+        let _ = writeln!(output, "  \"source_sha256\": \"{}\",", self.source_sha256);
         let _ = writeln!(output, "  \"cases\": [");
         for (index, case) in self.cases.iter().enumerate() {
             let comma = if index + 1 == self.cases.len() { "" } else { "," };
@@ -352,11 +352,7 @@ fn write_auth_device_mutations(
     )?;
 
     let mut stale_timestamp = parsed.clone();
-    set_header(
-        &mut stale_timestamp,
-        "X-DragonForge-Device-Timestamp",
-        "1",
-    );
+    set_header(&mut stale_timestamp, "X-DragonForge-Device-Timestamp", "1");
     write_mutation(
         output_dir,
         cases,
@@ -367,11 +363,7 @@ fn write_auth_device_mutations(
     )?;
 
     let mut signature_flip = parsed.clone();
-    set_header(
-        &mut signature_flip,
-        "X-DragonForge-Device-Signature",
-        "00",
-    );
+    set_header(&mut signature_flip, "X-DragonForge-Device-Signature", "00");
     write_mutation(
         output_dir,
         cases,
@@ -452,11 +444,7 @@ fn write_enrollment_recovery_mutations(
         r#""vaultId":"00000000-0000-0000-0000-000000000002","generation":1,"#,
         r#""timestamp":1,"nonceHex":"00","signatureHex":"00"}"#
     );
-    let recovery = synthesize_json_mutation(
-        parsed,
-        "/v1/recovery/begin",
-        recovery_body.as_bytes(),
-    );
+    let recovery = synthesize_json_mutation(parsed, "/v1/recovery/begin", recovery_body.as_bytes());
     write_mutation(
         output_dir,
         cases,
@@ -489,9 +477,7 @@ fn parse_loopback_base_url(base_url: &str) -> Result<SocketAddrV4, SyncApiError>
     if value.contains('/') {
         return Err(SyncApiError::InvalidBaseUrl);
     }
-    let (host, port) = value
-        .rsplit_once(':')
-        .ok_or(SyncApiError::InvalidBaseUrl)?;
+    let (host, port) = value.rsplit_once(':').ok_or(SyncApiError::InvalidBaseUrl)?;
     if host != "127.0.0.1" {
         return Err(SyncApiError::NonLoopbackTarget);
     }
@@ -502,7 +488,6 @@ fn parse_loopback_base_url(base_url: &str) -> Result<SocketAddrV4, SyncApiError>
         .ok_or(SyncApiError::InvalidBaseUrl)?;
     Ok(SocketAddrV4::new(Ipv4Addr::LOCALHOST, port))
 }
-
 
 fn probe(
     endpoint: SocketAddrV4,
@@ -547,7 +532,6 @@ fn probe_health(endpoint: SocketAddrV4) -> Result<LiveProbeCase, SyncApiError> {
         },
     })
 }
-
 
 fn probe_declared_oversize(
     endpoint: SocketAddrV4,
@@ -652,7 +636,7 @@ fn check_security_headers(status: u16, headers: &[(String, String)], _body: &[u8
         && header_value(headers, "referrer-policy") == Some("no-referrer")
 }
 
-fn header_value(headers: &[(String, String)], name: &str) -> Option<&str> {
+fn header_value<'a>(headers: &'a [(String, String)], name: &str) -> Option<&'a str> {
     headers
         .iter()
         .find(|(header, _)| header.eq_ignore_ascii_case(name))
@@ -762,12 +746,7 @@ fn write_manifest(output_dir: &Path) -> Result<(), SyncApiError> {
     entries.sort_by(|left, right| left.0.cmp(&right.0));
     let mut manifest = String::new();
     for (name, bytes) in entries {
-        let _ = writeln!(
-            manifest,
-            "{}  {}",
-            hex_digest(&sha256_bytes(&bytes)),
-            name
-        );
+        let _ = writeln!(manifest, "{}  {}", hex_digest(&sha256_bytes(&bytes)), name);
     }
     fs::write(output_dir.join("SHA256SUMS"), manifest)?;
     Ok(())
@@ -807,8 +786,8 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::{
-        generate_sync_request_mutations, parse_capture, parse_loopback_base_url,
-        run_sync_api_probe, SYNC_PROTOCOL_VERSION,
+        SYNC_PROTOCOL_VERSION, generate_sync_request_mutations, parse_capture,
+        parse_loopback_base_url, run_sync_api_probe,
     };
 
     fn temp_path(label: &str) -> PathBuf {
@@ -816,10 +795,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .expect("clock")
             .as_nanos();
-        std::env::temp_dir().join(format!(
-            "dfstl-sync-{label}-{}-{nonce}",
-            std::process::id()
-        ))
+        std::env::temp_dir().join(format!("dfstl-sync-{label}-{}-{nonce}", std::process::id()))
     }
 
     #[test]
@@ -927,9 +903,7 @@ mod tests {
                         "{}Content-Length: 0\r\n",
                         "Connection: close\r\n\r\n"
                     ),
-                    status,
-                    reason,
-                    extra
+                    status, reason, extra
                 );
                 stream.write_all(response.as_bytes()).expect("response");
             }
