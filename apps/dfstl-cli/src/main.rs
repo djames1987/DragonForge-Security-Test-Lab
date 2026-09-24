@@ -2,16 +2,22 @@
 
 use std::env;
 use std::path::PathBuf;
+use std::process::{Command, Stdio};
+use std::thread;
+use std::time::Duration;
 
 use dfstl_core::{
-    Artifact, DEFAULT_FUZZ_CASES, EXPECTED_EXECUTABLES, EncryptedFormat, ExecutionModel,
+    Artifact, DEFAULT_CPU_ITERATIONS, DEFAULT_FUZZ_CASES, DEFAULT_MEMORY_BYTES,
+    DEFAULT_SOCKET_CONNECTIONS, EXPECTED_EXECUTABLES, EncryptedFormat, ExecutionModel,
     ExecutionPolicy, ExternalToolStatus, FuzzTarget, PackageManifestStatus, Runner, SafetyClass,
     SecurityTest, TargetError, TestCategory, TestContext, TestDescriptor, TestExecution,
     TestRegistry, generate_fuzz_corpus, generate_mutation_corpus, generate_runtime_mutation_corpus,
     generate_sync_request_mutations, inspect_target, load_sentinels, path_policy_corpus,
-    promote_regression_fixture, resolve_target, run_agent_attack_harness, run_external_scanners,
+    promote_regression_fixture, resolve_target, run_agent_attack_harness,
+    run_bounded_resource_stress, run_external_scanners, run_failure_injection_lab,
     run_filesystem_lab, run_sync_api_probe, scan_artifact_roots, scan_process_dump, scan_source,
-    synthetic_memory_lifecycle_check, write_scan_bundle, write_secret_leak_bundle,
+    synthetic_memory_lifecycle_check, write_failure_bundle, write_scan_bundle,
+    write_secret_leak_bundle,
 };
 
 fn main() {
@@ -57,6 +63,11 @@ fn main() {
             let arguments: Vec<String> = args.collect();
             secret_leak_command(&arguments);
         }
+        "failure" => {
+            let arguments: Vec<String> = args.collect();
+            failure_command(&arguments);
+        }
+        "__phase10-worker" => phase10_worker(),
         "version" | "--version" | "-V" => {
             println!("dfstl {}", env!("CARGO_PKG_VERSION"));
         }
@@ -72,7 +83,7 @@ fn main() {
 fn describe() {
     let policy = ExecutionPolicy::default();
     println!("DragonForge Security Test Lab");
-    println!("phase: 9");
+    println!("phase: 10");
     println!("default-safety-policy: {}", policy.maximum_class());
     println!(
         "controlled-allowed-by-default: {}",
@@ -127,10 +138,17 @@ fn describe() {
     println!("process-dump-scan: offline-only");
     println!("process-dump-scan-safety-class: lab-only");
     println!("memory-lifecycle-self-check: available");
+    println!("failure-injection-lab: available");
+    println!("failure-injection-safety-class: controlled");
+    println!("fault-cases: disk-full,permission-denied,interrupted-write,interrupted-restore");
+    println!("bounded-resource-stress: cpu,memory,loopback-sockets");
+    println!("resource-stress-safety-class: lab-only");
+    println!("self-child-termination: available");
+    println!("process-termination-safety-class: lab-only");
     println!(concat!(
         "active-attack-implementations: encrypted-format-mutation,",
         "agent-loopback-harness,filesystem-lab,sync-api-harness,fuzz-regression-corpus,",
-        "secret-leak-scan,memory-dump-scan"
+        "secret-leak-scan,memory-dump-scan,failure-injection,resource-stress,self-child-kill"
     ));
 }
 
@@ -168,6 +186,15 @@ fn registry() -> TestRegistry {
         .expect("static built-in test ID must be valid");
     registry
         .register(MemoryLifecycleSelfCheck)
+        .expect("static built-in test ID must be valid");
+    registry
+        .register(FailureInjectionSelfCheck)
+        .expect("static built-in test ID must be valid");
+    registry
+        .register(ResourceStressSelfCheck)
+        .expect("static built-in test ID must be valid");
+    registry
+        .register(ProcessTerminationSelfCheck)
         .expect("static built-in test ID must be valid");
     registry
 }
@@ -1304,13 +1331,235 @@ fn secret_memory_check_command(arguments: &[String]) {
     }
 }
 
+
+fn failure_command(arguments: &[String]) {
+    let Some(subcommand) = arguments.first() else {
+        eprintln!("failure requires a subcommand: inject, resource, or process-termination");
+        std::process::exit(2);
+    };
+
+    match subcommand.as_str() {
+        "inject" => failure_inject_command(&arguments[1..]),
+        "resource" => failure_resource_command(&arguments[1..]),
+        "process-termination" => failure_process_termination_command(&arguments[1..]),
+        other => {
+            eprintln!("unknown failure subcommand: {other}");
+            std::process::exit(2);
+        }
+    }
+}
+
+fn failure_inject_command(arguments: &[String]) {
+    let mut root = None;
+    let mut output = None;
+    let mut controlled = false;
+    let mut json = false;
+    let mut index = 0_usize;
+
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--root" => {
+                index += 1;
+                root = arguments.get(index).map(PathBuf::from);
+            }
+            "--output" => {
+                index += 1;
+                output = arguments.get(index).map(PathBuf::from);
+            }
+            "--controlled" => controlled = true,
+            "--json" => json = true,
+            unknown => {
+                eprintln!("unknown failure inject option: {unknown}");
+                std::process::exit(2);
+            }
+        }
+        index += 1;
+    }
+
+    if !controlled {
+        eprintln!("failure injection is Controlled-class; rerun with explicit --controlled");
+        std::process::exit(6);
+    }
+    let Some(root) = root else {
+        eprintln!("failure inject requires --root PATH");
+        std::process::exit(2);
+    };
+    let Some(output) = output else {
+        eprintln!("failure inject requires --output PATH");
+        std::process::exit(2);
+    };
+
+    let report = run_failure_injection_lab(&root).unwrap_or_else(|error| {
+        eprintln!("failure injection lab failed: {error}");
+        std::process::exit(3);
+    });
+    write_failure_bundle(&output, Some(&report), None).unwrap_or_else(|error| {
+        eprintln!("failure injection evidence write failed: {error}");
+        std::process::exit(3);
+    });
+
+    if json {
+        print!("{}", report.to_json_pretty());
+    } else {
+        println!("DragonForge failure injection lab");
+        for case in &report.cases {
+            println!("{}  {}", case.id, if case.passed { "pass" } else { "fail" });
+        }
+        println!("Evidence directory: {}", output.display());
+    }
+    if !report.all_passed() {
+        std::process::exit(1);
+    }
+}
+
+fn failure_resource_command(arguments: &[String]) {
+    let mut output = None;
+    let mut cpu = DEFAULT_CPU_ITERATIONS;
+    let mut memory = DEFAULT_MEMORY_BYTES;
+    let mut sockets = DEFAULT_SOCKET_CONNECTIONS;
+    let mut lab_ack = false;
+    let mut json = false;
+    let mut index = 0_usize;
+
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--output" => {
+                index += 1;
+                output = arguments.get(index).map(PathBuf::from);
+            }
+            "--cpu" => {
+                index += 1;
+                cpu = parse_u64_arg(arguments.get(index), "--cpu");
+            }
+            "--memory-bytes" => {
+                index += 1;
+                memory = usize::try_from(parse_u64_arg(arguments.get(index), "--memory-bytes"))
+                    .unwrap_or_else(|_| {
+                        eprintln!("--memory-bytes is too large for this platform");
+                        std::process::exit(2);
+                    });
+            }
+            "--sockets" => {
+                index += 1;
+                sockets = usize::try_from(parse_u64_arg(arguments.get(index), "--sockets"))
+                    .unwrap_or_else(|_| {
+                        eprintln!("--sockets is too large for this platform");
+                        std::process::exit(2);
+                    });
+            }
+            "--lab-ack" => lab_ack = true,
+            "--json" => json = true,
+            unknown => {
+                eprintln!("unknown failure resource option: {unknown}");
+                std::process::exit(2);
+            }
+        }
+        index += 1;
+    }
+
+    if !lab_ack {
+        eprintln!("bounded resource stress is LabOnly; rerun with explicit --lab-ack");
+        std::process::exit(7);
+    }
+    let Some(output) = output else {
+        eprintln!("failure resource requires --output PATH");
+        std::process::exit(2);
+    };
+
+    let report = run_bounded_resource_stress(cpu, memory, sockets).unwrap_or_else(|error| {
+        eprintln!("bounded resource stress failed: {error}");
+        std::process::exit(3);
+    });
+    write_failure_bundle(&output, None, Some(&report)).unwrap_or_else(|error| {
+        eprintln!("resource stress evidence write failed: {error}");
+        std::process::exit(3);
+    });
+
+    if json {
+        print!("{}", report.to_json_pretty());
+    } else {
+        println!("DragonForge bounded resource stress");
+        println!("CPU iterations: {}", report.cpu_iterations);
+        println!("Memory bytes: {}", report.memory_bytes);
+        println!("Socket connections: {}", report.socket_connections);
+        println!("Elapsed ms: {}", report.elapsed_ms);
+        println!("Evidence directory: {}", output.display());
+    }
+}
+
+fn failure_process_termination_command(arguments: &[String]) {
+    let mut lab_ack = false;
+    let mut json = false;
+    for argument in arguments {
+        match argument.as_str() {
+            "--lab-ack" => lab_ack = true,
+            "--json" => json = true,
+            unknown => {
+                eprintln!("unknown process-termination option: {unknown}");
+                std::process::exit(2);
+            }
+        }
+    }
+    if !lab_ack {
+        eprintln!("self-child termination is LabOnly; rerun with explicit --lab-ack");
+        std::process::exit(7);
+    }
+
+    let executable = env::current_exe().unwrap_or_else(|error| {
+        eprintln!("unable to locate DFSTL executable: {error}");
+        std::process::exit(3);
+    });
+    let mut child = Command::new(executable)
+        .arg("__phase10-worker")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap_or_else(|error| {
+            eprintln!("unable to spawn DFSTL termination worker: {error}");
+            std::process::exit(3);
+        });
+
+    thread::sleep(Duration::from_millis(100));
+    let running = child.try_wait().ok().flatten().is_none();
+    let killed = child.kill().is_ok();
+    let waited = child.wait().is_ok();
+    let passed = running && killed && waited;
+
+    if json {
+        println!(
+            "{{\"schema_version\":1,\"target\":\"self-child\",\"running_before_kill\":{running},\"kill_requested\":{killed},\"wait_completed\":{waited},\"passed\":{passed}}}"
+        );
+    } else {
+        println!("self-child-termination: {}", if passed { "pass" } else { "fail" });
+    }
+    if !passed {
+        std::process::exit(1);
+    }
+}
+
+fn phase10_worker() {
+    thread::sleep(Duration::from_secs(30));
+}
+
+fn parse_u64_arg(value: Option<&String>, name: &str) -> u64 {
+    let Some(value) = value else {
+        eprintln!("{name} requires an integer");
+        std::process::exit(2);
+    };
+    value.parse::<u64>().unwrap_or_else(|_| {
+        eprintln!("{name} must be an unsigned integer");
+        std::process::exit(2);
+    })
+}
+
 fn help() {
     println!("DragonForge Security Test Lab");
     println!();
     println!("Usage: dfstl <command>");
     println!();
     println!("Commands:");
-    println!("  describe                         Show the Phase 9 runtime model");
+    println!("  describe                         Show the Phase 10 runtime model");
     println!("  list                             List registered built-in tests");
     println!("  run [--output PATH] [--controlled] [--lab-ack]");
     println!(
@@ -1346,6 +1595,12 @@ fn help() {
     println!("    --dump PATH --sentinels PATH --output PATH --lab-ack [--json]");
     println!("  secret-leak memory-check         Run synthetic in-place memory clearing check");
     println!("    --controlled");
+    println!("  failure inject                  Run deterministic failure injection fixtures");
+    println!("    --root PATH --output PATH --controlled [--json]");
+    println!("  failure resource                Run bounded CPU/memory/loopback socket stress");
+    println!("    --output PATH --lab-ack [--cpu N] [--memory-bytes N] [--sockets N] [--json]");
+    println!("  failure process-termination     Spawn and terminate a DFSTL self-child only");
+    println!("    --lab-ack [--json]");
     println!("  version                          Show the CLI version");
     println!("  help                 Show this help");
 }
@@ -1660,5 +1915,86 @@ impl SecurityTest for MemoryLifecycleSelfCheck {
                 "synthetic secret buffer did not clear in place",
             ))
         }
+    }
+}
+
+struct FailureInjectionSelfCheck;
+
+impl SecurityTest for FailureInjectionSelfCheck {
+    fn descriptor(&self) -> &TestDescriptor {
+        static DESCRIPTOR: TestDescriptor = TestDescriptor::new(
+            "FAULT-INJECT-001",
+            "Deterministic failure injection and recovery consistency capability",
+            TestCategory::FaultInjection,
+            SafetyClass::Controlled,
+            ExecutionModel::WhiteBox,
+        );
+        &DESCRIPTOR
+    }
+
+    fn execute(&self, context: &TestContext<'_>) -> Result<TestExecution, String> {
+        if !context.policy.allows(SafetyClass::Controlled) {
+            return Ok(TestExecution::new(
+                dfstl_core::TestStatus::Fail,
+                "Controlled failure injection executed without Controlled policy",
+            ));
+        }
+        Ok(TestExecution::pass(
+            "deterministic disk, permission, interrupted-write, and restore faults are available",
+        ))
+    }
+}
+
+struct ResourceStressSelfCheck;
+
+impl SecurityTest for ResourceStressSelfCheck {
+    fn descriptor(&self) -> &TestDescriptor {
+        static DESCRIPTOR: TestDescriptor = TestDescriptor::new(
+            "RESOURCE-LAB-001",
+            "Bounded CPU memory and loopback socket stress capability",
+            TestCategory::ResourceExhaustion,
+            SafetyClass::LabOnly,
+            ExecutionModel::Hybrid,
+        );
+        &DESCRIPTOR
+    }
+
+    fn execute(&self, context: &TestContext<'_>) -> Result<TestExecution, String> {
+        if !context.policy.allows(SafetyClass::LabOnly) {
+            return Ok(TestExecution::new(
+                dfstl_core::TestStatus::Fail,
+                "LabOnly resource stress executed without LabOnly policy",
+            ));
+        }
+        Ok(TestExecution::pass(
+            "bounded CPU memory and loopback socket stress is explicitly authorized",
+        ))
+    }
+}
+
+struct ProcessTerminationSelfCheck;
+
+impl SecurityTest for ProcessTerminationSelfCheck {
+    fn descriptor(&self) -> &TestDescriptor {
+        static DESCRIPTOR: TestDescriptor = TestDescriptor::new(
+            "FAULT-KILL-001",
+            "DFSTL self-child process termination capability",
+            TestCategory::FaultInjection,
+            SafetyClass::LabOnly,
+            ExecutionModel::BlackBox,
+        );
+        &DESCRIPTOR
+    }
+
+    fn execute(&self, context: &TestContext<'_>) -> Result<TestExecution, String> {
+        if !context.policy.allows(SafetyClass::LabOnly) {
+            return Ok(TestExecution::new(
+                dfstl_core::TestStatus::Fail,
+                "LabOnly process termination executed without LabOnly policy",
+            ));
+        }
+        Ok(TestExecution::pass(
+            "self-child-only process termination harness is explicitly authorized",
+        ))
     }
 }
