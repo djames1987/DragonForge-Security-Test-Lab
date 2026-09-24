@@ -1067,7 +1067,7 @@ fn fuzz_promote_command(arguments: &[String]) {
         eprintln!("fuzz promote requires --target NAME");
         std::process::exit(2);
     };
-    let target = FuzzTarget::parse(&target).unwrap_or_else(|error| {
+    let target = FuzzTarget::from_name(&target).unwrap_or_else(|error| {
         eprintln!("fuzz target failed: {error}");
         std::process::exit(2);
     });
