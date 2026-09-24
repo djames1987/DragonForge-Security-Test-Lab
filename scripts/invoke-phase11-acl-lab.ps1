@@ -116,15 +116,35 @@ try {
 } catch { exit 13 }
 "@
 
+$ownerPassword = $env:DFSTL_PHASE11_OWNER_PASSWORD
 $otherPassword = $env:DFSTL_PHASE11_OTHER_PASSWORD
+if ([string]::IsNullOrWhiteSpace($ownerPassword)) {
+    throw "DFSTL_PHASE11_OWNER_PASSWORD is required for owner probes."
+}
 if ([string]::IsNullOrWhiteSpace($otherPassword)) {
     throw "DFSTL_PHASE11_OTHER_PASSWORD is required for cross-user probes."
 }
 
+$ownerReadExit = Invoke-AsUser $OwnerUser $ownerPassword $probeRead
+$ownerWriteExit = Invoke-AsUser $OwnerUser $ownerPassword $probeWrite
 $readExit = Invoke-AsUser $OtherUser $otherPassword $probeRead
 $writeExit = Invoke-AsUser $OtherUser $otherPassword $probeWrite
+$ownerRead = ($ownerReadExit -eq 0)
+$ownerWrite = ($ownerWriteExit -eq 0)
 $effectiveRead = ($readExit -eq 0)
 $effectiveWrite = ($writeExit -eq 0)
+$adminRead = $false
+$adminWrite = $false
+try {
+    Get-Content -LiteralPath $session -Raw | Out-Null
+    $adminRead = $true
+    $stream = [IO.File]::Open($session,[IO.FileMode]::Open,[IO.FileAccess]::Write,[IO.FileShare]::Read)
+    $stream.Dispose()
+    $adminWrite = $true
+} catch {
+    $adminRead = $false
+    $adminWrite = $false
+}
 
 $badDir = Join-Path $Root "broad-inheritance"
 New-Item -ItemType Directory -Path $badDir | Out-Null
@@ -146,10 +166,14 @@ $result = [ordered]@{
     other_user = $OtherUser
     other_sid = $otherSid.Value
     restricted_targets = 5
+    owner_user_read_allowed = $ownerRead
+    owner_user_write_allowed = $ownerWrite
+    administrator_read_allowed = $adminRead
+    administrator_write_allowed = $adminWrite
     other_user_read_denied = (-not $effectiveRead)
     other_user_write_denied = (-not $effectiveWrite)
     inherited_broad_write_fixture = $badFile
-    passed = ((-not $effectiveRead) -and (-not $effectiveWrite))
+    passed = ($ownerRead -and $ownerWrite -and $adminRead -and $adminWrite -and (-not $effectiveRead) -and (-not $effectiveWrite))
 }
 $json = $result | ConvertTo-Json -Depth 4
 [IO.File]::WriteAllText((Join-Path $Output "multi-user-results.json"),$json,[Text.UTF8Encoding]::new($false))
