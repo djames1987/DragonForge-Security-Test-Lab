@@ -68,7 +68,11 @@ Phase 1 extends it with:
 - SHA-256 request-mutation evidence manifests;
 - deterministic structure-aware fuzz corpus generation;
 - isolated side-effect-free cargo-fuzz entry points;
-- oracle-based minimization and hash-addressed permanent regression promotion.
+- oracle-based minimization and hash-addressed permanent regression promotion;
+- synthetic-secret artifact scanning with redaction-safe findings;
+- canonical containment for explicit diagnostic roots;
+- LabOnly read-only process-dump scanning without dump retention;
+- synthetic in-place memory lifecycle verification.
 
 It intentionally does not contain adversarial attack implementations through Phase 1.
 
@@ -118,7 +122,7 @@ A test report must record which model was used.
 1. Unknown safety state fails closed.
 2. Default policy permits Safe tests only.
 3. A higher-risk test cannot silently downgrade its metadata.
-4. Target/source/seed/runtime/lab/capture paths and live API endpoints must be explicit before scanning or adversarial testing; ambiguous or non-loopback live API targets fail closed.
+4. Target/source/seed/runtime/lab/capture/dump paths and live API endpoints must be explicit before scanning or adversarial testing; ambiguous or non-loopback live API targets fail closed.
 5. Evidence must not intentionally contain real secrets.
 6. Every test has a stable identifier.
 7. A failed tester/infrastructure action is not reported as a target vulnerability.
