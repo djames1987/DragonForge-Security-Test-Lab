@@ -28,9 +28,9 @@ function New-AllowRule(
     )
 }
 function Set-RestrictedDirectoryAcl([string]$Path,[System.Security.Principal.SecurityIdentifier]$OwnerSid) {
-    $acl = New-Object System.Security.AccessControl.DirectorySecurity
+    $acl = Get-Acl -LiteralPath $Path
     $acl.SetAccessRuleProtection($true,$false)
-    $acl.SetOwner($OwnerSid)
+    foreach ($ace in @($acl.Access)) { [void]$acl.RemoveAccessRuleAll($ace) }
     $acl.AddAccessRule((New-AllowRule $OwnerSid "FullControl" "ContainerInherit,ObjectInherit" "None"))
     $system = Resolve-Sid "NT AUTHORITY\SYSTEM"
     $admins = Resolve-Sid "BUILTIN\Administrators"
@@ -96,7 +96,6 @@ foreach ($file in @($runtime,$session,$lock,$serviceConfig,$audit)) {
     $acl = Get-Acl -LiteralPath $file
     $acl.SetAccessRuleProtection($true,$false)
     foreach ($ace in @($acl.Access)) { [void]$acl.RemoveAccessRuleAll($ace) }
-    $acl.SetOwner($ownerSid)
     $acl.AddAccessRule((New-AllowRule $ownerSid "FullControl" "None" "None"))
     $acl.AddAccessRule((New-AllowRule (Resolve-Sid "NT AUTHORITY\SYSTEM") "FullControl" "None" "None"))
     $acl.AddAccessRule((New-AllowRule (Resolve-Sid "BUILTIN\Administrators") "FullControl" "None" "None"))
