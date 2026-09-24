@@ -154,12 +154,18 @@ Delivered:
 
 ## Phase 11 — Windows Multi-User and ACL Testing
 
-Planned:
-- normal/admin users;
-- runtime file ACLs;
-- protected data access boundaries;
-- cross-user read/write attempts;
-- inherited ACL validation.
+**Status: Implementation Complete — Verification Pending**
+
+Delivered:
+- elevated disposable Windows multi-user test harness;
+- temporary non-admin local account provisioning and guaranteed cleanup;
+- DragonForge-shaped Agent and privileged-service ACL fixtures;
+- explicit owner/SYSTEM/Administrators ACL enforcement on sensitive files;
+- real cross-user read and write denial probes;
+- intentionally unsafe inherited BUILTIN\Users Modify regression fixture;
+- bounded ACL snapshot parser and broad-write/inheritance analysis;
+- JSON evidence plus SHA-256 manifests;
+- ACL runner registration with LabOnly policy enforcement.
 
 ## Phase 12 — VM and Multi-Machine Orchestration
 
