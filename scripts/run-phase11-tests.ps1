@@ -13,9 +13,12 @@ $PublicLabRoot = "C:\Users\Public\DFSTL-Phase11-$Stamp"
 $Failures = [System.Collections.Generic.List[string]]::new()
 $Warnings = [System.Collections.Generic.List[string]]::new()
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-$TempUserName = "DFSTL11" + (Get-Random -Minimum 100000 -Maximum 999999)
-$TempUserCreated = $false
-$TempPassword = "Dfstl!" + ([Guid]::NewGuid().ToString("N")) + "9Aa"
+$OwnerUserName = "DFSTL11O" + (Get-Random -Minimum 10000 -Maximum 99999)
+$OtherUserName = "DFSTL11X" + (Get-Random -Minimum 10000 -Maximum 99999)
+$OwnerUserCreated = $false
+$OtherUserCreated = $false
+$OwnerPassword = "Dfstl!" + ([Guid]::NewGuid().ToString("N")) + "9Aa"
+$OtherPassword = "Dfstl!" + ([Guid]::NewGuid().ToString("N")) + "8Bb"
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 
 function Log([string]$Text = "") {
@@ -196,11 +199,17 @@ try {
     if (Test-Path -LiteralPath (Join-Path $LabOutput "multi-user-results.json") -PathType Leaf) {
         $Multi = Get-Content -LiteralPath (Join-Path $LabOutput "multi-user-results.json") -Raw | ConvertFrom-Json
         Pass "multi-user schema_version is 1" ($Multi.schema_version -eq 1)
+        Pass "owner user read is allowed" ($Multi.owner_user_read_allowed)
+        Pass "owner user write is allowed" ($Multi.owner_user_write_allowed)
+        Pass "Administrator read is allowed" ($Multi.administrator_read_allowed)
+        Pass "Administrator write is allowed" ($Multi.administrator_write_allowed)
         Pass "cross-user read is denied" ($Multi.other_user_read_denied)
         Pass "cross-user write is denied" ($Multi.other_user_write_denied)
         Pass "five sensitive targets were restricted" ($Multi.restricted_targets -eq 5)
         Pass "multi-user result passed" ($Multi.passed)
-        Pass "temporary password not written to results" (-not ((Get-Content -LiteralPath (Join-Path $LabOutput "multi-user-results.json") -Raw).Contains($TempPassword)))
+        $MultiRaw = Get-Content -LiteralPath (Join-Path $LabOutput "multi-user-results.json") -Raw
+        Pass "owner password not written to results" (-not $MultiRaw.Contains($OwnerPassword))
+        Pass "cross-user password not written to results" (-not $MultiRaw.Contains($OtherPassword))
     }
     ValidateManifest $LabOutput
 
@@ -285,14 +294,24 @@ catch {
     Log "PHASE 11 VALIDATION: FAIL"
 }
 finally {
+    $env:DFSTL_PHASE11_OWNER_PASSWORD = $null
     $env:DFSTL_PHASE11_OTHER_PASSWORD = $null
-    if ($TempUserCreated) {
+    if ($OtherUserCreated) {
         try {
-            Remove-LocalUser -Name $TempUserName -ErrorAction Stop
-            Log ("CLEANUP  removed temporary local user " + $TempUserName)
+            Remove-LocalUser -Name $OtherUserName -ErrorAction Stop
+            Log ("CLEANUP  removed temporary cross-user " + $OtherUserName)
         } catch {
-            Log ("CLEANUP WARNING  unable to remove temporary user " + $TempUserName)
-            $Warnings.Add("Temporary local user cleanup failed")
+            Log ("CLEANUP WARNING  unable to remove temporary cross-user " + $OtherUserName)
+            $Warnings.Add("Temporary cross-user cleanup failed")
+        }
+    }
+    if ($OwnerUserCreated) {
+        try {
+            Remove-LocalUser -Name $OwnerUserName -ErrorAction Stop
+            Log ("CLEANUP  removed temporary owner user " + $OwnerUserName)
+        } catch {
+            Log ("CLEANUP WARNING  unable to remove temporary owner user " + $OwnerUserName)
+            $Warnings.Add("Temporary owner-user cleanup failed")
         }
     }
     if (Test-Path -LiteralPath $PublicLabRoot) {
