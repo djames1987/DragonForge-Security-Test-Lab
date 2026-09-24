@@ -6,7 +6,7 @@ DFSTL is intentionally maintained as a separate project from the product it test
 
 ## Project status
 
-**Phase 8 — Fuzzing & Regression Corpus: Implementation Complete — Verification Pending**
+**Phase 8 — Fuzzing & Regression Corpus: Verified Complete**
 
 Phases 0 through 7 are verified complete. Phase 8 adds deterministic structure-aware fuzz corpus generation, isolated cargo-fuzz targets, crash minimization support, content-hash regression promotion, and checked-in permanent security regression fixtures.
 
