@@ -35,7 +35,9 @@ impl fmt::Display for FailureLabError {
             Self::RootIsSymlink(path) => {
                 write!(formatter, "failure-lab root must not be a symlink: {}", path.display())
             }
-            Self::InvalidBudget => formatter.write_str("resource stress budget is outside safe limits"),
+            Self::InvalidBudget => {
+                formatter.write_str("resource stress budget is outside safe limits")
+            }
             Self::RecoveryInvariant(detail) => {
                 write!(formatter, "recovery invariant failed: {detail}")
             }
@@ -256,7 +258,9 @@ pub fn write_failure_bundle(
 fn disk_full_write_case() -> FaultCase {
     let mut writer = FailingWriter::new(FailingWriterMode::DiskFull, 8);
     let first = writer.write_all(b"12345678").is_ok();
-    let second = writer.write_all(b"9").is_err_and(|error| error.kind() == io::ErrorKind::StorageFull);
+    let second = writer
+        .write_all(b"9")
+        .is_err_and(|error| error.kind() == io::ErrorKind::StorageFull);
     FaultCase {
         id: "disk-full-write".to_owned(),
         passed: first && second,
@@ -298,7 +302,8 @@ fn interrupted_atomic_write_case(root: &Path) -> Result<FaultCase, FailureLabErr
     Ok(FaultCase {
         id: "interrupted-atomic-write".to_owned(),
         passed: stable_before_recovery && stable_after_recovery && staging_removed,
-        detail: "partial staging data never replaced committed state and cleanup recovered".to_owned(),
+        detail: "partial staging data never replaced committed state and cleanup recovered"
+            .to_owned(),
     })
 }
 
