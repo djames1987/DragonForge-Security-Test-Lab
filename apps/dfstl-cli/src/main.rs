@@ -799,7 +799,8 @@ fn sync_api_probe_command(arguments: &[String]) {
             println!(
                 "{}  status={}  {}",
                 case.id,
-                case.status.map_or_else(|| "none".to_owned(), |value| value.to_string()),
+                case.status
+                    .map_or_else(|| "none".to_owned(), |value| value.to_string()),
                 if case.passed { "pass" } else { "fail" }
             );
         }
