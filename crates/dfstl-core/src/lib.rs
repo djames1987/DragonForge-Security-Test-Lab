@@ -28,10 +28,10 @@ pub use encrypted_formats::{
 };
 pub use evidence::{EvidenceError, EvidenceLimits, EvidenceSession};
 pub use failure_lab::{
-    DEFAULT_CPU_ITERATIONS, DEFAULT_MEMORY_BYTES, DEFAULT_SOCKET_CONNECTIONS, FailureInjectionReport,
-    FailureLabError, FaultCase, MAX_CPU_ITERATIONS, MAX_MEMORY_BYTES, MAX_SOCKET_CONNECTIONS,
-    ResourceStressReport, run_bounded_resource_stress, run_failure_injection_lab,
-    write_failure_bundle,
+    DEFAULT_CPU_ITERATIONS, DEFAULT_MEMORY_BYTES, DEFAULT_SOCKET_CONNECTIONS,
+    FailureInjectionReport, FailureLabError, FaultCase, MAX_CPU_ITERATIONS, MAX_MEMORY_BYTES,
+    MAX_SOCKET_CONNECTIONS, ResourceStressReport, run_bounded_resource_stress,
+    run_failure_injection_lab, write_failure_bundle,
 };
 pub use filesystem_lab::{
     FilesystemLabError, FilesystemLabReport, LabCase, LabCaseStatus, MAX_LAB_CASES, PathCorpusCase,
