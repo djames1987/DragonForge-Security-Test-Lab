@@ -65,7 +65,10 @@ Phase 1 extends it with:
 - filesystem-lab evidence manifests that avoid following reparse links;
 - Controlled Password Manager sync/API loopback probing;
 - offline captured-request mutation for signed/authenticated API traffic;
-- SHA-256 request-mutation evidence manifests.
+- SHA-256 request-mutation evidence manifests;
+- deterministic structure-aware fuzz corpus generation;
+- isolated side-effect-free cargo-fuzz entry points;
+- oracle-based minimization and hash-addressed permanent regression promotion.
 
 It intentionally does not contain adversarial attack implementations through Phase 1.
 
