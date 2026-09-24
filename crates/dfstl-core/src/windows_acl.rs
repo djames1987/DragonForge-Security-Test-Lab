@@ -359,6 +359,21 @@ mod tests {
     }
 
     #[test]
+    fn inherited_owner_write_is_not_flagged_as_unexpected() {
+        let input = temp_path("owner.tsv");
+        fs::write(
+            &input,
+            "C:\\lab\\agent-session.key	LAB\\Owner	LAB\\Owner	Allow	FullControl	true
+",
+        )
+        .expect("write");
+        let records = parse_acl_snapshot(&input).expect("parse");
+        let report = analyze_acl_records(&records);
+        assert!(report.clean());
+        fs::remove_file(input).expect("cleanup");
+    }
+
+    #[test]
     fn evidence_manifest_is_written() {
         let input = temp_path("manifest.tsv");
         let output = temp_path("manifest-out");
