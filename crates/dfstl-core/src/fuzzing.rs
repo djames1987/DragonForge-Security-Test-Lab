@@ -81,7 +81,7 @@ impl FuzzTarget {
     ///
     /// # Errors
     ///
-    /// Returns InvalidTarget for unknown names.
+    /// Returns `InvalidTarget` for unknown names.
     pub fn from_name(value: &str) -> Result<Self, FuzzError> {
         match value {
             "dfvault" => Ok(Self::DfVault),
@@ -362,18 +362,13 @@ pub fn promote_regression_fixture(
 pub fn exercise_fuzz_input(target: FuzzTarget, data: &[u8]) -> u64 {
     match target {
         FuzzTarget::WindowsPath => std::str::from_utf8(data).map_or(0, |value| {
-            if crate::filesystem_lab::validate_windows_relative_path(value).is_ok() {
-                1
-            } else {
-                0
-            }
+            u64::from(crate::filesystem_lab::validate_windows_relative_path(value).is_ok())
         }),
         FuzzTarget::SyncHttp => exercise_http_shape(data),
         FuzzTarget::AgentJson | FuzzTarget::PasswordManagerJson => exercise_json_shape(data),
-        FuzzTarget::DfVault
-        | FuzzTarget::DfBackup
-        | FuzzTarget::DfShare
-        | FuzzTarget::DfAuth => exercise_binary_shape(data),
+        FuzzTarget::DfVault | FuzzTarget::DfBackup | FuzzTarget::DfShare | FuzzTarget::DfAuth => {
+            exercise_binary_shape(data)
+        }
     }
 }
 
@@ -456,12 +451,21 @@ fn mutate_case(
         3 => (append(seed, &[0]), "append-zero".to_owned()),
         4 => (append(seed, &[0xff]), "append-ff".to_owned()),
         5 => (flip_random_bit(seed, rng), "seeded-bitflip".to_owned()),
-        6 => (overwrite_random_byte(seed, rng, 0), "seeded-zero-byte".to_owned()),
-        7 => (overwrite_random_byte(seed, rng, 0xff), "seeded-ff-byte".to_owned()),
+        6 => (
+            overwrite_random_byte(seed, rng, 0),
+            "seeded-zero-byte".to_owned(),
+        ),
+        7 => (
+            overwrite_random_byte(seed, rng, 0xff),
+            "seeded-ff-byte".to_owned(),
+        ),
         8 => structure_version_mutation(target, seed),
         9 => structure_length_mutation(target, seed),
         10 => structure_separator_mutation(target, seed),
-        _ => (insert_random_byte(seed, rng), "seeded-byte-insert".to_owned()),
+        _ => (
+            insert_random_byte(seed, rng),
+            "seeded-byte-insert".to_owned(),
+        ),
     }
 }
 
@@ -670,10 +674,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .expect("clock")
             .as_nanos();
-        std::env::temp_dir().join(format!(
-            "dfstl-fuzz-{label}-{}-{nonce}",
-            std::process::id()
-        ))
+        std::env::temp_dir().join(format!("dfstl-fuzz-{label}-{}-{nonce}", std::process::id()))
     }
 
     #[test]
@@ -683,8 +684,8 @@ mod tests {
         let second = temp_path("second");
         fs::write(&seed_path, b"DragonForge").expect("seed");
 
-        let one = generate_fuzz_corpus(FuzzTarget::AgentJson, &seed_path, &first, 42, 24)
-            .expect("first");
+        let one =
+            generate_fuzz_corpus(FuzzTarget::AgentJson, &seed_path, &first, 42, 24).expect("first");
         let two = generate_fuzz_corpus(FuzzTarget::AgentJson, &seed_path, &second, 42, 24)
             .expect("second");
 
@@ -699,7 +700,10 @@ mod tests {
     #[test]
     fn all_fuzz_targets_parse_and_generate_structure_cases() {
         for target in FuzzTarget::all() {
-            assert_eq!(FuzzTarget::from_name(target.as_str()).expect("parse"), target);
+            assert_eq!(
+                FuzzTarget::from_name(target.as_str()).expect("parse"),
+                target
+            );
         }
     }
 
@@ -726,7 +730,11 @@ mod tests {
             "synthetic regression",
         )
         .expect("promote");
-        assert!(fixture.filename.ends_with(".bin"));
+        assert!(
+            std::path::Path::new(&fixture.filename)
+                .extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("bin"))
+        );
         assert!(
             regression
                 .join("sync-http")
@@ -734,13 +742,8 @@ mod tests {
                 .is_file()
         );
         assert!(
-            promote_regression_fixture(
-                FuzzTarget::SyncHttp,
-                &candidate,
-                &regression,
-                "duplicate"
-            )
-            .is_err()
+            promote_regression_fixture(FuzzTarget::SyncHttp, &candidate, &regression, "duplicate")
+                .is_err()
         );
 
         fs::remove_file(candidate).expect("cleanup candidate");
