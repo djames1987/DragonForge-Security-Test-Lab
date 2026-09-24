@@ -1331,7 +1331,6 @@ fn secret_memory_check_command(arguments: &[String]) {
     }
 }
 
-
 fn failure_command(arguments: &[String]) {
     let Some(subcommand) = arguments.first() else {
         eprintln!("failure requires a subcommand: inject, resource, or process-termination");
@@ -1533,13 +1532,13 @@ fn failure_process_termination_command(arguments: &[String]) {
                 "\"running_before_kill\":{},\"kill_requested\":{},",
                 "\"wait_completed\":{},\"passed\":{}}}"
             ),
-            running,
-            killed,
-            waited,
-            passed
+            running, killed, waited, passed
         );
     } else {
-        println!("self-child-termination: {}", if passed { "pass" } else { "fail" });
+        println!(
+            "self-child-termination: {}",
+            if passed { "pass" } else { "fail" }
+        );
     }
     if !passed {
         std::process::exit(1);
