@@ -25,12 +25,16 @@ Fields:
 - `other_user`;
 - `other_sid`;
 - `restricted_targets`;
+- `owner_user_read_allowed`;
+- `owner_user_write_allowed`;
+- `administrator_read_allowed`;
+- `administrator_write_allowed`;
 - `other_user_read_denied`;
 - `other_user_write_denied`;
 - `inherited_broad_write_fixture`;
 - `passed`.
 
-The temporary user's password is never serialized.
+The temporary users' passwords are never serialized.
 
 ## acl-analysis.json
 
