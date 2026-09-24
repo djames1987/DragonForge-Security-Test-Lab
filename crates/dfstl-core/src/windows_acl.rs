@@ -87,7 +87,11 @@ impl AclAnalysisReport {
         let _ = writeln!(output, "  \"clean\": {},", self.clean());
         let _ = writeln!(output, "  \"findings\": [");
         for (index, finding) in self.findings.iter().enumerate() {
-            let comma = if index + 1 == self.findings.len() { "" } else { "," };
+            let comma = if index + 1 == self.findings.len() {
+                ""
+            } else {
+                ","
+            };
             let _ = writeln!(
                 output,
                 concat!(
