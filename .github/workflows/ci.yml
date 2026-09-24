@@ -13,7 +13,7 @@ env:
 
 jobs:
   validation:
-    name: Phase 10 Failure Resource Regression
+    name: Phase 11 ACL Regression
     runs-on: ubuntu-latest
 
     steps:
@@ -38,36 +38,35 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
-      - name: Phase 10 failure/resource smoke test
+      - name: Phase 11 ACL analyzer smoke test
         shell: pwsh
         run: |
           $Describe = cargo run -p dfstl-cli -- describe
           $Describe
-          if ($Describe -notmatch "phase: 10") { throw "Phase marker missing" }
-          if ($Describe -notmatch "failure-injection-lab: available") { throw "Failure capability missing" }
+          if ($Describe -notmatch "phase: 11") { throw "Phase marker missing" }
+          if ($Describe -notmatch "windows-acl-analysis: available") { throw "ACL capability missing" }
 
           $List = cargo run -p dfstl-cli -- list
           $List
-          if ($List -notmatch "FAULT-INJECT-001") { throw "FAULT injection test missing" }
-          if ($List -notmatch "RESOURCE-LAB-001") { throw "RESOURCE test missing" }
-          if ($List -notmatch "FAULT-KILL-001") { throw "FAULT kill test missing" }
+          if ($List -notmatch "ACL-WINDOWS-001") { throw "ACL test missing" }
 
-          cargo test -p dfstl-core failure_injection_matrix_preserves_recovery_invariants
-          if ($LASTEXITCODE -ne 0) { throw "Failure injection regression failed" }
+          cargo test -p dfstl-core broad_write_is_reported
+          if ($LASTEXITCODE -ne 0) { throw "ACL broad-write regression failed" }
 
-          cargo test -p dfstl-core resource_stress_is_bounded_and_completes
-          if ($LASTEXITCODE -ne 0) { throw "Resource stress regression failed" }
+          cargo test -p dfstl-core restricted_sensitive_acl_is_clean
+          if ($LASTEXITCODE -ne 0) { throw "ACL restricted regression failed" }
 
-          $Root = Join-Path $PWD "ci-phase10"
+          $Root = Join-Path $PWD "ci-phase11"
           New-Item -ItemType Directory -Force -Path $Root | Out-Null
-          cargo run -p dfstl-cli -- failure inject --root (Join-Path $Root "lab") --output (Join-Path $Root "failure") --controlled --json
-          if ($LASTEXITCODE -ne 0) { throw "Failure injection CLI failed" }
+          $Snapshot = Join-Path $Root "clean.tsv"
+          $Tab = [char]9
+          @(
+            ("C:\Lab\agent\agent-session.key" + $Tab + "OWNER" + $Tab + "OWNER" + $Tab + "Allow" + $Tab + "FullControl" + $Tab + "false"),
+            ("C:\Lab\agent\agent-session.key" + $Tab + "OWNER" + $Tab + "NT AUTHORITY\SYSTEM" + $Tab + "Allow" + $Tab + "FullControl" + $Tab + "false")
+          ) | Set-Content -LiteralPath $Snapshot -Encoding UTF8
 
-          cargo run -p dfstl-cli -- failure resource --output (Join-Path $Root "resource") --lab-ack --cpu 2000 --memory-bytes 65536 --sockets 4 --json
-          if ($LASTEXITCODE -ne 0) { throw "Resource stress CLI failed" }
-
-          cargo run -p dfstl-cli -- failure process-termination --lab-ack --json
-          if ($LASTEXITCODE -ne 0) { throw "Self-child termination failed" }
+          cargo run -p dfstl-cli -- windows-acl analyze --input $Snapshot --output (Join-Path $Root "analysis") --lab-ack --json
+          if ($LASTEXITCODE -ne 0) { throw "ACL analyzer clean fixture failed" }
 
           cargo run -p dfstl-cli -- run --lab-ack --output (Join-Path $Root "lab-runner")
           if ($LASTEXITCODE -ne 0) { throw "LabOnly runner regression failed" }
