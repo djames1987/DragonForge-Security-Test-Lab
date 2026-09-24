@@ -7,8 +7,9 @@ use dfstl_core::{
     Artifact, EXPECTED_EXECUTABLES, EncryptedFormat, ExecutionModel, ExecutionPolicy,
     ExternalToolStatus, PackageManifestStatus, Runner, SafetyClass, SecurityTest, TargetError,
     TestCategory, TestContext, TestDescriptor, TestExecution, TestRegistry,
-    generate_mutation_corpus, generate_runtime_mutation_corpus, generate_sync_request_mutations,
-    inspect_target, path_policy_corpus, resolve_target, run_agent_attack_harness,
+    DEFAULT_FUZZ_CASES, FuzzTarget, generate_fuzz_corpus, generate_mutation_corpus,
+    generate_runtime_mutation_corpus, generate_sync_request_mutations, inspect_target,
+    path_policy_corpus, promote_regression_fixture, resolve_target, run_agent_attack_harness,
     run_external_scanners, run_filesystem_lab, run_sync_api_probe, scan_source, write_scan_bundle,
 };
 
@@ -47,6 +48,10 @@ fn main() {
             let arguments: Vec<String> = args.collect();
             sync_api_command(&arguments);
         }
+        "fuzz" => {
+            let arguments: Vec<String> = args.collect();
+            fuzz_command(&arguments);
+        }
         "version" | "--version" | "-V" => {
             println!("dfstl {}", env!("CARGO_PKG_VERSION"));
         }
@@ -62,7 +67,7 @@ fn main() {
 fn describe() {
     let policy = ExecutionPolicy::default();
     println!("DragonForge Security Test Lab");
-    println!("phase: 7");
+    println!("phase: 8");
     println!("default-safety-policy: {}", policy.maximum_class());
     println!(
         "controlled-allowed-by-default: {}",
@@ -104,6 +109,11 @@ fn describe() {
     println!("sync-api-live-safety-class: controlled");
     println!("sync-api-live-target: ipv4-loopback-only");
     println!("sync-api-request-mutation: offline-only");
+    println!("deterministic-fuzz-corpus: available");
+    println!("fuzz-targets: dfvault,dfbackup,dfshare,dfauth,password-manager-json,agent-json,sync-http,windows-path");
+    println!("fuzz-regression-promotion: available");
+    println!("fuzz-minimizer-api: available");
+    println!("cargo-fuzz-scaffold: available");
     println!(concat!(
         "active-attack-implementations: encrypted-format-mutation,",
         "agent-loopback-harness,filesystem-lab"
@@ -135,6 +145,9 @@ fn registry() -> TestRegistry {
         .expect("static built-in test ID must be valid");
     registry
         .register(SyncApiHarnessSelfCheck)
+        .expect("static built-in test ID must be valid");
+    registry
+        .register(FuzzRegressionSelfCheck)
         .expect("static built-in test ID must be valid");
     registry
 }
@@ -880,13 +893,212 @@ fn sync_api_mutate_command(arguments: &[String]) {
     }
 }
 
+
+fn fuzz_command(arguments: &[String]) {
+    let Some(subcommand) = arguments.first() else {
+        eprintln!("fuzz requires a subcommand: corpus or promote");
+        std::process::exit(2);
+    };
+
+    match subcommand.as_str() {
+        "corpus" => fuzz_corpus_command(&arguments[1..]),
+        "promote" => fuzz_promote_command(&arguments[1..]),
+        other => {
+            eprintln!("unknown fuzz subcommand: {other}");
+            std::process::exit(2);
+        }
+    }
+}
+
+fn fuzz_corpus_command(arguments: &[String]) {
+    let mut target = None;
+    let mut input = None;
+    let mut output = None;
+    let mut seed = 0x4452_4147_4f4e_4655_u64;
+    let mut count = DEFAULT_FUZZ_CASES;
+    let mut controlled = false;
+    let mut json = false;
+    let mut index = 0_usize;
+
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--target" => {
+                index += 1;
+                let Some(value) = arguments.get(index) else {
+                    eprintln!("--target requires a value");
+                    std::process::exit(2);
+                };
+                target = Some(value.clone());
+            }
+            "--input" => {
+                index += 1;
+                let Some(value) = arguments.get(index) else {
+                    eprintln!("--input requires a path");
+                    std::process::exit(2);
+                };
+                input = Some(PathBuf::from(value));
+            }
+            "--output" => {
+                index += 1;
+                let Some(value) = arguments.get(index) else {
+                    eprintln!("--output requires a path");
+                    std::process::exit(2);
+                };
+                output = Some(PathBuf::from(value));
+            }
+            "--seed" => {
+                index += 1;
+                let Some(value) = arguments.get(index) else {
+                    eprintln!("--seed requires an integer");
+                    std::process::exit(2);
+                };
+                seed = value.parse::<u64>().unwrap_or_else(|_| {
+                    eprintln!("--seed must be an unsigned integer");
+                    std::process::exit(2);
+                });
+            }
+            "--count" => {
+                index += 1;
+                let Some(value) = arguments.get(index) else {
+                    eprintln!("--count requires an integer");
+                    std::process::exit(2);
+                };
+                count = value.parse::<usize>().unwrap_or_else(|_| {
+                    eprintln!("--count must be an unsigned integer");
+                    std::process::exit(2);
+                });
+            }
+            "--controlled" => controlled = true,
+            "--json" => json = true,
+            unknown => {
+                eprintln!("unknown fuzz corpus option: {unknown}");
+                std::process::exit(2);
+            }
+        }
+        index += 1;
+    }
+
+    if !controlled {
+        eprintln!("fuzz corpus generation is Controlled-class; rerun with explicit --controlled");
+        std::process::exit(6);
+    }
+
+    let Some(target) = target else {
+        eprintln!("fuzz corpus requires --target NAME");
+        std::process::exit(2);
+    };
+    let target = FuzzTarget::parse(&target).unwrap_or_else(|error| {
+        eprintln!("fuzz target failed: {error}");
+        std::process::exit(2);
+    });
+    let Some(input) = input else {
+        eprintln!("fuzz corpus requires --input PATH");
+        std::process::exit(2);
+    };
+    let Some(output) = output else {
+        eprintln!("fuzz corpus requires --output PATH");
+        std::process::exit(2);
+    };
+
+    let corpus = generate_fuzz_corpus(target, &input, &output, seed, count).unwrap_or_else(|error| {
+        eprintln!("fuzz corpus generation failed: {error}");
+        std::process::exit(3);
+    });
+
+    if json {
+        print!("{}", corpus.to_json_pretty());
+    } else {
+        println!("DragonForge deterministic fuzz corpus");
+        println!("Target: {}", corpus.target);
+        println!("RNG seed: {}", corpus.rng_seed);
+        println!("Cases: {}", corpus.cases.len());
+        println!("Output: {}", output.display());
+        println!("Manifest: {}", output.join("SHA256SUMS").display());
+    }
+}
+
+fn fuzz_promote_command(arguments: &[String]) {
+    let mut target = None;
+    let mut input = None;
+    let mut regression_root = None;
+    let mut note = String::new();
+    let mut controlled = false;
+    let mut json = false;
+    let mut index = 0_usize;
+
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--target" => {
+                index += 1;
+                target = arguments.get(index).cloned();
+            }
+            "--input" => {
+                index += 1;
+                input = arguments.get(index).map(PathBuf::from);
+            }
+            "--regression-root" => {
+                index += 1;
+                regression_root = arguments.get(index).map(PathBuf::from);
+            }
+            "--note" => {
+                index += 1;
+                note = arguments.get(index).cloned().unwrap_or_default();
+            }
+            "--controlled" => controlled = true,
+            "--json" => json = true,
+            unknown => {
+                eprintln!("unknown fuzz promote option: {unknown}");
+                std::process::exit(2);
+            }
+        }
+        index += 1;
+    }
+
+    if !controlled {
+        eprintln!("fuzz regression promotion is Controlled-class; rerun with explicit --controlled");
+        std::process::exit(6);
+    }
+
+    let Some(target) = target else {
+        eprintln!("fuzz promote requires --target NAME");
+        std::process::exit(2);
+    };
+    let target = FuzzTarget::parse(&target).unwrap_or_else(|error| {
+        eprintln!("fuzz target failed: {error}");
+        std::process::exit(2);
+    });
+    let Some(input) = input else {
+        eprintln!("fuzz promote requires --input PATH");
+        std::process::exit(2);
+    };
+    let Some(regression_root) = regression_root else {
+        eprintln!("fuzz promote requires --regression-root PATH");
+        std::process::exit(2);
+    };
+
+    let fixture =
+        promote_regression_fixture(target, &input, &regression_root, &note).unwrap_or_else(|error| {
+            eprintln!("fuzz regression promotion failed: {error}");
+            std::process::exit(3);
+        });
+
+    if json {
+        print!("{}", fixture.to_json_pretty());
+    } else {
+        println!("DragonForge regression fixture promoted");
+        println!("Target: {}", fixture.target);
+        println!("File: {}", fixture.filename);
+        println!("SHA-256: {}", fixture.sha256);
+    }
+}
+
 fn help() {
     println!("DragonForge Security Test Lab");
     println!();
     println!("Usage: dfstl <command>");
     println!();
     println!("Commands:");
-    println!("  describe                         Show the Phase 7 runtime model");
+    println!("  describe                         Show the Phase 8 runtime model");
     println!("  list                             List registered built-in tests");
     println!("  run [--output PATH] [--controlled] [--lab-ack]");
     println!(
@@ -908,6 +1120,10 @@ fn help() {
     println!("    --controlled [--json]");
     println!("  sync-api mutate --input PATH     Generate offline captured-request mutations");
     println!("    --output PATH --controlled [--json]");
+    println!("  fuzz corpus --target NAME        Generate deterministic structure-aware corpus");
+    println!("    --input PATH --output PATH --controlled [--seed N] [--count N] [--json]");
+    println!("  fuzz promote --target NAME       Promote candidate into permanent regression corpus");
+    println!("    --input PATH --regression-root PATH --controlled [--note TEXT] [--json]");
     println!("  version                          Show the CLI version");
     println!("  help                 Show this help");
 }
@@ -1132,6 +1348,34 @@ impl SecurityTest for SyncApiHarnessSelfCheck {
 
         Ok(TestExecution::pass(
             "bounded loopback sync API attack harness is authorized",
+        ))
+    }
+}
+
+struct FuzzRegressionSelfCheck;
+
+impl SecurityTest for FuzzRegressionSelfCheck {
+    fn descriptor(&self) -> &TestDescriptor {
+        static DESCRIPTOR: TestDescriptor = TestDescriptor::new(
+            "FUZZ-CORPUS-001",
+            "Deterministic fuzz and regression corpus capability",
+            TestCategory::Fuzzing,
+            SafetyClass::Controlled,
+            ExecutionModel::WhiteBox,
+        );
+        &DESCRIPTOR
+    }
+
+    fn execute(&self, context: &TestContext<'_>) -> Result<TestExecution, String> {
+        if !context.policy.allows(SafetyClass::Controlled) {
+            return Ok(TestExecution::new(
+                dfstl_core::TestStatus::Fail,
+                "Controlled fuzz corpus test executed without Controlled policy",
+            ));
+        }
+
+        Ok(TestExecution::pass(
+            "deterministic fuzz corpus and regression promotion are authorized",
         ))
     }
 }
