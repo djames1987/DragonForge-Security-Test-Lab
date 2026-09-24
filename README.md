@@ -6,7 +6,7 @@ DFSTL is intentionally maintained as a separate project from the product it test
 
 ## Project status
 
-**Phase 7 — Password Manager Sync/API Security Testing: Implementation Complete — Verification Pending**
+**Phase 7 — Password Manager Sync/API Security Testing: Verified Complete**
 
 Phases 0 through 6 are verified complete. Phase 7 adds a Controlled Password Manager sync/API harness with bounded loopback probes and an offline captured-request mutation corpus for authentication, device authorization, replay, revisions, enrollment, and recovery boundaries.
 
@@ -85,7 +85,7 @@ See [SAFETY.md](SAFETY.md) and [docs/TEST_TAXONOMY.md](docs/TEST_TAXONOMY.md).
 - Phase 4 — Encrypted-format adversarial testing: **Verified Complete**
 - Phase 5 — DragonForge Agent attack harness: **Verified Complete**
 - Phase 6 — Filesystem, reparse-point, and TOCTOU laboratory: **Verified Complete**
-- Phase 7 — Password Manager sync/API attack harness: **Implementation Complete — Verification Pending**
+- Phase 7 — Password Manager sync/API attack harness: **Verified Complete**
 - Phase 8 — Fuzzing and security-regression corpus
 - Phase 9 — Secret-leak and memory-lifecycle testing
 - Phase 10 — Failure injection and resource-exhaustion testing
