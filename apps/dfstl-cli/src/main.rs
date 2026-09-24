@@ -4,13 +4,13 @@ use std::env;
 use std::path::PathBuf;
 
 use dfstl_core::{
-    Artifact, EXPECTED_EXECUTABLES, EncryptedFormat, ExecutionModel, ExecutionPolicy,
-    ExternalToolStatus, PackageManifestStatus, Runner, SafetyClass, SecurityTest, TargetError,
-    TestCategory, TestContext, TestDescriptor, TestExecution, TestRegistry,
-    DEFAULT_FUZZ_CASES, FuzzTarget, generate_fuzz_corpus, generate_mutation_corpus,
-    generate_runtime_mutation_corpus, generate_sync_request_mutations, inspect_target,
-    path_policy_corpus, promote_regression_fixture, resolve_target, run_agent_attack_harness,
-    run_external_scanners, run_filesystem_lab, run_sync_api_probe, scan_source, write_scan_bundle,
+    Artifact, DEFAULT_FUZZ_CASES, EXPECTED_EXECUTABLES, EncryptedFormat, ExecutionModel,
+    ExecutionPolicy, ExternalToolStatus, FuzzTarget, PackageManifestStatus, Runner, SafetyClass,
+    SecurityTest, TargetError, TestCategory, TestContext, TestDescriptor, TestExecution,
+    TestRegistry, generate_fuzz_corpus, generate_mutation_corpus, generate_runtime_mutation_corpus,
+    generate_sync_request_mutations, inspect_target, path_policy_corpus,
+    promote_regression_fixture, resolve_target, run_agent_attack_harness, run_external_scanners,
+    run_filesystem_lab, run_sync_api_probe, scan_source, write_scan_bundle,
 };
 
 fn main() {
@@ -895,7 +895,6 @@ fn sync_api_mutate_command(arguments: &[String]) {
     }
 }
 
-
 fn fuzz_command(arguments: &[String]) {
     let Some(subcommand) = arguments.first() else {
         eprintln!("fuzz requires a subcommand: corpus or promote");
@@ -1002,10 +1001,11 @@ fn fuzz_corpus_command(arguments: &[String]) {
         std::process::exit(2);
     };
 
-    let corpus = generate_fuzz_corpus(target, &input, &output, seed, count).unwrap_or_else(|error| {
-        eprintln!("fuzz corpus generation failed: {error}");
-        std::process::exit(3);
-    });
+    let corpus =
+        generate_fuzz_corpus(target, &input, &output, seed, count).unwrap_or_else(|error| {
+            eprintln!("fuzz corpus generation failed: {error}");
+            std::process::exit(3);
+        });
 
     if json {
         print!("{}", corpus.to_json_pretty());
@@ -1080,8 +1080,8 @@ fn fuzz_promote_command(arguments: &[String]) {
         std::process::exit(2);
     };
 
-    let fixture =
-        promote_regression_fixture(target, &input, &regression_root, &note).unwrap_or_else(|error| {
+    let fixture = promote_regression_fixture(target, &input, &regression_root, &note)
+        .unwrap_or_else(|error| {
             eprintln!("fuzz regression promotion failed: {error}");
             std::process::exit(3);
         });
