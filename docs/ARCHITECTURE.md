@@ -76,7 +76,10 @@ Phase 1 extends it with:
 - deterministic failure injection through synthetic writers and disposable staging roots;
 - recovery-consistency checks for interrupted writes/restores;
 - LabOnly hard-capped CPU/memory/loopback-socket stress;
-- LabOnly self-child-only process termination testing.
+- LabOnly self-child-only process termination testing;
+- elevated disposable Windows multi-user ACL testing;
+- real secondary-logon read/write boundary probes;
+- bounded ACL snapshot analysis and inherited-permission regression evidence.
 
 It intentionally does not contain adversarial attack implementations through Phase 1.
 
