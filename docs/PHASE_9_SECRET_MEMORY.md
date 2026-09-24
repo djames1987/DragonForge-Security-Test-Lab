@@ -2,7 +2,7 @@
 
 ## Status
 
-**Implementation Complete — Verification Pending**
+**Verified Complete**
 
 Phase 9 adds synthetic-secret leak detection across DragonForge diagnostic artifacts plus LabOnly offline process-dump analysis and secret-lifecycle evidence.
 
@@ -218,13 +218,44 @@ The validator checks:
 - Safe/Controlled/LabOnly runner policy boundaries;
 - release build.
 
-## Exit criteria
+## Verification record
 
-Phase 9 is verified when validation ends with:
+Phase 9 was locally verified on Windows on 2026-09-23 against commit:
 
 ```text
-Warnings: 0
-Failures: 0
+8cedeea60559906ae691d52182bb7b8d0cf980e9
+```
 
-PHASE 9 VALIDATION: PASS
+The release-mode validation completed with:
+
+- a clean `main` branch;
+- rustfmt passing;
+- strict Clippy passing with warnings denied;
+- 61 debug tests passing;
+- 61 release tests passing;
+- secret representation regression passing;
+- process-dump regression passing;
+- synthetic memory lifecycle regression passing;
+- a fresh Phase 9 release CLI build succeeding;
+- Phase 9 capability markers and LEAK/MEMORY registrations confirmed;
+- Controlled artifact-scan refusal without `--controlled`;
+- LabOnly dump-scan refusal without `--lab-ack`;
+- Controlled memory-check refusal without `--controlled`;
+- clean artifact scan producing zero findings;
+- intentional raw secret leak detection without echoing the secret value;
+- redaction-safe JSON/text evidence and independently validated SHA-256 manifests;
+- synthetic memory lifecycle check passing;
+- UTF-16LE process-dump sentinel detection;
+- process-dump contents not copied into evidence;
+- Safe runner skipping both LEAK and MEMORY capabilities;
+- Controlled runner passing LEAK while keeping MEMORY and filesystem LabOnly tests skipped;
+- LabOnly runner passing all 11 registered tests;
+- release workspace build succeeding;
+- zero warnings and zero failures.
+
+Validation evidence:
+
+```text
+phase9-validation-20260923-222308.log
+SHA-256: 3B06F1F897CE1FCAC8E18FA793799A86B84E491C8CF7BB300707664DDB3A0232
 ```
