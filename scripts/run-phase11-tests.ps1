@@ -77,6 +77,16 @@ function Test-IsAdministrator {
     $Principal = New-Object Security.Principal.WindowsPrincipal($Identity)
     return $Principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
+function Test-PowerShellSyntax([string]$Path) {
+    $Tokens = $null
+    $Errors = $null
+    [void][System.Management.Automation.Language.Parser]::ParseFile(
+        $Path,
+        [ref]$Tokens,
+        [ref]$Errors
+    )
+    return ($Errors.Count -eq 0)
+}
 
 Push-Location $RepoRoot
 try {
@@ -115,10 +125,20 @@ try {
     foreach ($Path in @(
         "crates/dfstl-core/src/windows_acl.rs",
         "scripts/invoke-phase11-acl-lab.ps1",
+        "scripts/capture-phase11-dragonforge-acls.ps1",
         "docs/PHASE_11_WINDOWS_ACL.md",
         "docs/WINDOWS_ACL_SCHEMA.md",
         "scripts/run-phase11-tests.ps1"
     )) { Pass $Path (Test-Path -LiteralPath (Join-Path $RepoRoot $Path) -PathType Leaf) }
+
+    Section "PowerShell syntax"
+    foreach ($Script in @(
+        "scripts/invoke-phase11-acl-lab.ps1",
+        "scripts/capture-phase11-dragonforge-acls.ps1",
+        "scripts/run-phase11-tests.ps1"
+    )) {
+        Pass ($Script + " parses") (Test-PowerShellSyntax (Join-Path $RepoRoot $Script))
+    }
 
     Native "Cargo metadata" "cargo" @("metadata","--format-version","1","--no-deps") | Out-Null
     Native "Formatting" "cargo" @("fmt","--all","--check") | Out-Null
