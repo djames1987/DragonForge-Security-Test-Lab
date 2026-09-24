@@ -50,9 +50,10 @@ Rules:
 - values are synthetic ASCII only;
 - values are 12 to 512 bytes;
 - maximum 64 sentinels;
+- the sentinel definition file is bounded to 64 KiB;
 - an empty sentinel set is rejected.
 
-Sentinel values are held in dedicated buffers whose Drop implementation overwrites the bytes with zero.
+Sentinel values are held in dedicated buffers whose Drop implementation overwrites the bytes with zero. The original sentinel-file read buffer and temporary raw/hex/Base64/UTF-16LE search patterns are also overwritten before deallocation.
 
 Reports never include sentinel values.
 
