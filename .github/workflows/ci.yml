@@ -13,7 +13,7 @@ env:
 
 jobs:
   validation:
-    name: Phase 8 Fuzz Regression
+    name: Phase 9 Secret Leak Regression
     runs-on: ubuntu-latest
 
     steps:
@@ -38,32 +38,35 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
-      - name: Phase 8 deterministic fuzz smoke test
+      - name: Phase 9 secret leak smoke test
         shell: pwsh
         run: |
           $Describe = cargo run -p dfstl-cli -- describe
           $Describe
-          if ($Describe -notmatch "phase: 8") { throw "Phase marker missing" }
-          if ($Describe -notmatch "deterministic-fuzz-corpus: available") { throw "Fuzz corpus capability missing" }
+          if ($Describe -notmatch "phase: 9") { throw "Phase marker missing" }
+          if ($Describe -notmatch "synthetic-secret-sentinel-scan: available") { throw "Secret leak capability missing" }
 
           $List = cargo run -p dfstl-cli -- list
           $List
-          if ($List -notmatch "FUZZ-CORPUS-001") { throw "Phase 8 fuzz test missing" }
+          if ($List -notmatch "LEAK-SENTINEL-001") { throw "LEAK test missing" }
+          if ($List -notmatch "MEMORY-LIFE-001") { throw "MEMORY test missing" }
 
-          cargo test -p dfstl-core deterministic_corpus_repeats_for_same_seed
-          if ($LASTEXITCODE -ne 0) { throw "Deterministic corpus regression failed" }
+          cargo test -p dfstl-core scanner_finds_raw_hex_and_base64_without_emitting_secret_value
+          if ($LASTEXITCODE -ne 0) { throw "Secret representation regression failed" }
 
-          cargo test -p dfstl-core minimizer_preserves_oracle_and_reduces_input
-          if ($LASTEXITCODE -ne 0) { throw "Minimizer regression failed" }
+          cargo test -p dfstl-core synthetic_memory_buffer_is_cleared_in_place
+          if ($LASTEXITCODE -ne 0) { throw "Memory lifecycle regression failed" }
 
-          $Root = Join-Path $PWD "ci-phase8"
-          New-Item -ItemType Directory -Force -Path $Root | Out-Null
-          cargo run -p dfstl-cli -- fuzz corpus --target agent-json --input corpus/seeds/agent-json.json --output (Join-Path $Root "corpus") --controlled --seed 42 --count 24 --json
-          if ($LASTEXITCODE -ne 0) { throw "Fuzz corpus CLI failed" }
+          $Root = Join-Path $PWD "ci-phase9"
+          $Clean = Join-Path $Root "clean"
+          New-Item -ItemType Directory -Force -Path $Clean | Out-Null
+          [IO.File]::WriteAllText((Join-Path $Clean "safe.log"), "token=[REDACTED]")
 
-          $Corpus = Get-Content (Join-Path $Root "corpus/corpus.json") -Raw | ConvertFrom-Json
-          if ($Corpus.schema_version -ne 1) { throw "Unexpected fuzz corpus schema" }
-          if ($Corpus.cases.Count -ne 24) { throw "Unexpected fuzz corpus case count" }
+          cargo run -p dfstl-cli -- secret-leak scan --root $Clean --sentinels corpus/seeds/phase9-sentinels.txt --output (Join-Path $Root "evidence") --controlled --json
+          if ($LASTEXITCODE -ne 0) { throw "Clean secret leak smoke scan failed" }
 
           cargo run -p dfstl-cli -- run --controlled --output (Join-Path $Root "controlled")
           if ($LASTEXITCODE -ne 0) { throw "Controlled runner regression failed" }
+
+          cargo run -p dfstl-cli -- run --lab-ack --output (Join-Path $Root "lab")
+          if ($LASTEXITCODE -ne 0) { throw "LabOnly runner regression failed" }
