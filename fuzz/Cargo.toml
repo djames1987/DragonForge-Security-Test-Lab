@@ -1,0 +1,40 @@
+[package]
+name = "dfstl-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+dfstl-core = { path = "../crates/dfstl-core" }
+
+[[bin]]
+name = "encrypted_formats"
+path = "fuzz_targets/encrypted_formats.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "agent_json"
+path = "fuzz_targets/agent_json.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "sync_http"
+path = "fuzz_targets/sync_http.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "windows_path"
+path = "fuzz_targets/windows_path.rs"
+test = false
+doc = false
+bench = false
