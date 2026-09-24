@@ -1,0 +1,10 @@
+PUT /v1/vaults/00000000-0000-0000-0000-000000000001 HTTP/1.1
+Host: 127.0.0.1:8787
+Authorization: Bearer 1111111111111111111111111111111111111111111111111111111111111111
+X-DragonForge-Device-Id: 00000000-0000-0000-0000-000000000002
+X-DragonForge-Device-Timestamp: 1000
+X-DragonForge-Device-Signature: aabb
+X-DragonForge-Base-Revision: 7
+Content-Length: 4
+
+test
