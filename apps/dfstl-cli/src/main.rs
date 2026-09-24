@@ -9,8 +9,10 @@ use dfstl_core::{
     SecurityTest, TargetError, TestCategory, TestContext, TestDescriptor, TestExecution,
     TestRegistry, generate_fuzz_corpus, generate_mutation_corpus, generate_runtime_mutation_corpus,
     generate_sync_request_mutations, inspect_target, path_policy_corpus,
-    promote_regression_fixture, resolve_target, run_agent_attack_harness, run_external_scanners,
-    run_filesystem_lab, run_sync_api_probe, scan_source, write_scan_bundle,
+    load_sentinels, promote_regression_fixture, resolve_target, run_agent_attack_harness,
+    run_external_scanners, run_filesystem_lab, run_sync_api_probe, scan_artifact_roots,
+    scan_process_dump, scan_source, synthetic_memory_lifecycle_check, write_scan_bundle,
+    write_secret_leak_bundle,
 };
 
 fn main() {
@@ -52,6 +54,10 @@ fn main() {
             let arguments: Vec<String> = args.collect();
             fuzz_command(&arguments);
         }
+        "secret-leak" => {
+            let arguments: Vec<String> = args.collect();
+            secret_leak_command(&arguments);
+        }
         "version" | "--version" | "-V" => {
             println!("dfstl {}", env!("CARGO_PKG_VERSION"));
         }
@@ -67,7 +73,7 @@ fn main() {
 fn describe() {
     let policy = ExecutionPolicy::default();
     println!("DragonForge Security Test Lab");
-    println!("phase: 8");
+    println!("phase: 9");
     println!("default-safety-policy: {}", policy.maximum_class());
     println!(
         "controlled-allowed-by-default: {}",
@@ -116,9 +122,16 @@ fn describe() {
     println!("fuzz-regression-promotion: available");
     println!("fuzz-minimizer-api: available");
     println!("cargo-fuzz-scaffold: available");
+    println!("synthetic-secret-sentinel-scan: available");
+    println!("secret-scan-representations: raw,hex-lower,base64");
+    println!("secret-artifact-scan-safety-class: controlled");
+    println!("process-dump-scan: offline-only");
+    println!("process-dump-scan-safety-class: lab-only");
+    println!("memory-lifecycle-self-check: available");
     println!(concat!(
         "active-attack-implementations: encrypted-format-mutation,",
-        "agent-loopback-harness,filesystem-lab,sync-api-harness,fuzz-regression-corpus"
+        "agent-loopback-harness,filesystem-lab,sync-api-harness,fuzz-regression-corpus,",
+        "secret-leak-scan,memory-dump-scan"
     ));
 }
 
@@ -150,6 +163,12 @@ fn registry() -> TestRegistry {
         .expect("static built-in test ID must be valid");
     registry
         .register(FuzzRegressionSelfCheck)
+        .expect("static built-in test ID must be valid");
+    registry
+        .register(SecretLeakSelfCheck)
+        .expect("static built-in test ID must be valid");
+    registry
+        .register(MemoryLifecycleSelfCheck)
         .expect("static built-in test ID must be valid");
     registry
 }
@@ -1096,13 +1115,204 @@ fn fuzz_promote_command(arguments: &[String]) {
     }
 }
 
+
+fn secret_leak_command(arguments: &[String]) {
+    let Some(subcommand) = arguments.first() else {
+        eprintln!("secret-leak requires a subcommand: scan, dump-scan, or memory-check");
+        std::process::exit(2);
+    };
+
+    match subcommand.as_str() {
+        "scan" => secret_leak_scan_command(&arguments[1..]),
+        "dump-scan" => secret_dump_scan_command(&arguments[1..]),
+        "memory-check" => secret_memory_check_command(&arguments[1..]),
+        other => {
+            eprintln!("unknown secret-leak subcommand: {other}");
+            std::process::exit(2);
+        }
+    }
+}
+
+fn secret_leak_scan_command(arguments: &[String]) {
+    let mut roots = Vec::new();
+    let mut sentinels_path = None;
+    let mut output = None;
+    let mut controlled = false;
+    let mut json = false;
+    let mut index = 0_usize;
+
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--root" => {
+                index += 1;
+                let Some(path) = arguments.get(index) else {
+                    eprintln!("--root requires a path");
+                    std::process::exit(2);
+                };
+                roots.push(PathBuf::from(path));
+            }
+            "--sentinels" => {
+                index += 1;
+                sentinels_path = arguments.get(index).map(PathBuf::from);
+            }
+            "--output" => {
+                index += 1;
+                output = arguments.get(index).map(PathBuf::from);
+            }
+            "--controlled" => controlled = true,
+            "--json" => json = true,
+            unknown => {
+                eprintln!("unknown secret-leak scan option: {unknown}");
+                std::process::exit(2);
+            }
+        }
+        index += 1;
+    }
+
+    if !controlled {
+        eprintln!("artifact secret scanning is Controlled-class; rerun with explicit --controlled");
+        std::process::exit(6);
+    }
+    if roots.is_empty() {
+        eprintln!("secret-leak scan requires at least one --root PATH");
+        std::process::exit(2);
+    }
+    let Some(sentinels_path) = sentinels_path else {
+        eprintln!("secret-leak scan requires --sentinels PATH");
+        std::process::exit(2);
+    };
+    let Some(output) = output else {
+        eprintln!("secret-leak scan requires --output PATH");
+        std::process::exit(2);
+    };
+
+    let sentinels = load_sentinels(&sentinels_path).unwrap_or_else(|error| {
+        eprintln!("synthetic sentinel loading failed: {error}");
+        std::process::exit(3);
+    });
+    let report = scan_artifact_roots(&roots, &sentinels).unwrap_or_else(|error| {
+        eprintln!("secret artifact scan failed: {error}");
+        std::process::exit(3);
+    });
+    write_secret_leak_bundle(&output, &report).unwrap_or_else(|error| {
+        eprintln!("secret leak evidence write failed: {error}");
+        std::process::exit(3);
+    });
+
+    if json {
+        print!("{}", report.to_json_pretty());
+    } else {
+        print!("{}", report.to_text());
+        println!("Evidence directory: {}", output.display());
+    }
+    if !report.clean() {
+        std::process::exit(1);
+    }
+}
+
+fn secret_dump_scan_command(arguments: &[String]) {
+    let mut dump = None;
+    let mut sentinels_path = None;
+    let mut output = None;
+    let mut lab_ack = false;
+    let mut json = false;
+    let mut index = 0_usize;
+
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--dump" => {
+                index += 1;
+                dump = arguments.get(index).map(PathBuf::from);
+            }
+            "--sentinels" => {
+                index += 1;
+                sentinels_path = arguments.get(index).map(PathBuf::from);
+            }
+            "--output" => {
+                index += 1;
+                output = arguments.get(index).map(PathBuf::from);
+            }
+            "--lab-ack" => lab_ack = true,
+            "--json" => json = true,
+            unknown => {
+                eprintln!("unknown secret-leak dump-scan option: {unknown}");
+                std::process::exit(2);
+            }
+        }
+        index += 1;
+    }
+
+    if !lab_ack {
+        eprintln!("process-dump scanning is LabOnly; rerun with explicit --lab-ack");
+        std::process::exit(7);
+    }
+    let Some(dump) = dump else {
+        eprintln!("secret-leak dump-scan requires --dump PATH");
+        std::process::exit(2);
+    };
+    let Some(sentinels_path) = sentinels_path else {
+        eprintln!("secret-leak dump-scan requires --sentinels PATH");
+        std::process::exit(2);
+    };
+    let Some(output) = output else {
+        eprintln!("secret-leak dump-scan requires --output PATH");
+        std::process::exit(2);
+    };
+
+    let sentinels = load_sentinels(&sentinels_path).unwrap_or_else(|error| {
+        eprintln!("synthetic sentinel loading failed: {error}");
+        std::process::exit(3);
+    });
+    let report = scan_process_dump(&dump, &sentinels).unwrap_or_else(|error| {
+        eprintln!("process dump scan failed: {error}");
+        std::process::exit(3);
+    });
+    write_secret_leak_bundle(&output, &report).unwrap_or_else(|error| {
+        eprintln!("memory scan evidence write failed: {error}");
+        std::process::exit(3);
+    });
+
+    if json {
+        print!("{}", report.to_json_pretty());
+    } else {
+        print!("{}", report.to_text());
+        println!("Evidence directory: {}", output.display());
+    }
+    if !report.clean() {
+        std::process::exit(1);
+    }
+}
+
+fn secret_memory_check_command(arguments: &[String]) {
+    let mut controlled = false;
+    for argument in arguments {
+        match argument.as_str() {
+            "--controlled" => controlled = true,
+            unknown => {
+                eprintln!("unknown secret-leak memory-check option: {unknown}");
+                std::process::exit(2);
+            }
+        }
+    }
+    if !controlled {
+        eprintln!("memory lifecycle self-check is Controlled-class; rerun with --controlled");
+        std::process::exit(6);
+    }
+    if synthetic_memory_lifecycle_check() {
+        println!("synthetic-memory-lifecycle: pass");
+    } else {
+        println!("synthetic-memory-lifecycle: fail");
+        std::process::exit(1);
+    }
+}
+
 fn help() {
     println!("DragonForge Security Test Lab");
     println!();
     println!("Usage: dfstl <command>");
     println!();
     println!("Commands:");
-    println!("  describe                         Show the Phase 8 runtime model");
+    println!("  describe                         Show the Phase 9 runtime model");
     println!("  list                             List registered built-in tests");
     println!("  run [--output PATH] [--controlled] [--lab-ack]");
     println!(
@@ -1130,6 +1340,12 @@ fn help() {
         "  fuzz promote --target NAME       Promote candidate into permanent regression corpus"
     );
     println!("    --input PATH --regression-root PATH --controlled [--note TEXT] [--json]");
+    println!("  secret-leak scan --root PATH     Scan explicit artifact roots for synthetic secrets");
+    println!("    [--root PATH ...] --sentinels PATH --output PATH --controlled [--json]");
+    println!("  secret-leak dump-scan            Scan one explicit offline process dump");
+    println!("    --dump PATH --sentinels PATH --output PATH --lab-ack [--json]");
+    println!("  secret-leak memory-check         Run synthetic in-place memory clearing check");
+    println!("    --controlled");
     println!("  version                          Show the CLI version");
     println!("  help                 Show this help");
 }
@@ -1383,5 +1599,66 @@ impl SecurityTest for FuzzRegressionSelfCheck {
         Ok(TestExecution::pass(
             "deterministic fuzz corpus and regression promotion are authorized",
         ))
+    }
+}
+
+struct SecretLeakSelfCheck;
+
+impl SecurityTest for SecretLeakSelfCheck {
+    fn descriptor(&self) -> &TestDescriptor {
+        static DESCRIPTOR: TestDescriptor = TestDescriptor::new(
+            "LEAK-SENTINEL-001",
+            "Synthetic secret artifact leak scanning capability",
+            TestCategory::SecretLeakage,
+            SafetyClass::Controlled,
+            ExecutionModel::WhiteBox,
+        );
+        &DESCRIPTOR
+    }
+
+    fn execute(&self, context: &TestContext<'_>) -> Result<TestExecution, String> {
+        if !context.policy.allows(SafetyClass::Controlled) {
+            return Ok(TestExecution::new(
+                dfstl_core::TestStatus::Fail,
+                "Controlled secret-leak self-check executed without Controlled policy",
+            ));
+        }
+        Ok(TestExecution::pass(
+            "synthetic raw/hex/base64 artifact leak scanning is authorized",
+        ))
+    }
+}
+
+struct MemoryLifecycleSelfCheck;
+
+impl SecurityTest for MemoryLifecycleSelfCheck {
+    fn descriptor(&self) -> &TestDescriptor {
+        static DESCRIPTOR: TestDescriptor = TestDescriptor::new(
+            "MEMORY-LIFE-001",
+            "Synthetic secret memory lifecycle and offline dump capability",
+            TestCategory::MemoryLifecycle,
+            SafetyClass::LabOnly,
+            ExecutionModel::Hybrid,
+        );
+        &DESCRIPTOR
+    }
+
+    fn execute(&self, context: &TestContext<'_>) -> Result<TestExecution, String> {
+        if !context.policy.allows(SafetyClass::LabOnly) {
+            return Ok(TestExecution::new(
+                dfstl_core::TestStatus::Fail,
+                "LabOnly memory lifecycle self-check executed without LabOnly policy",
+            ));
+        }
+        if synthetic_memory_lifecycle_check() {
+            Ok(TestExecution::pass(
+                "synthetic secret buffer clearing and offline dump analysis are available",
+            ))
+        } else {
+            Ok(TestExecution::new(
+                dfstl_core::TestStatus::Fail,
+                "synthetic secret buffer did not clear in place",
+            ))
+        }
     }
 }
