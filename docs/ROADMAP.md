@@ -125,11 +125,18 @@ Delivered:
 
 ## Phase 9 — Secret-Leak and Memory-Lifecycle Testing
 
-Planned:
-- synthetic sentinel secrets;
-- log/AppData/temp/support-bundle scanning;
-- controlled process-dump analysis in lab environments;
-- secret-lifecycle evidence.
+**Status: Implementation Complete — Verification Pending**
+
+Delivered:
+- synthetic ASCII sentinel definitions with zeroing-on-drop buffers;
+- raw, lowercase-hex, Base64, and UTF-16LE leak detection;
+- bounded explicit log/AppData/temp/support-root scanning;
+- symlink refusal and canonical reparse/junction containment;
+- redaction-safe JSON/text evidence plus SHA-256 manifests;
+- clean and intentionally leaky artifact regression coverage;
+- LabOnly bounded streaming analysis of explicit offline process dumps;
+- synthetic in-place secret buffer lifecycle check;
+- LEAK and MEMORY runner registrations with separate safety classes.
 
 ## Phase 10 — Failure Injection and Resource Exhaustion
 
