@@ -697,11 +697,16 @@ mod tests {
         fs::write(root.join("raw.log"), value).expect("raw");
         fs::write(root.join("hex.log"), super::hex_encode(value)).expect("hex");
         fs::write(root.join("base64.log"), super::base64_encode(value)).expect("base64");
+        fs::write(root.join("utf16.log"), super::utf16le_ascii(value)).expect("utf16");
 
         let report = scan_artifact_roots(&[root.clone()], &sentinels).expect("scan");
-        assert_eq!(report.findings.len(), 3);
+        assert_eq!(report.findings.len(), 4);
         let json = report.to_json_pretty();
         assert!(!json.contains("DFSTL-SYNTHETIC-TOKEN-1234567890"));
+        assert!(
+            format!("{:?}", sentinels.first().expect("sentinel"))
+                .contains("[REDACTED]")
+        );
 
         fs::remove_dir_all(root).expect("cleanup root");
         fs::remove_file(sentinels_path).expect("cleanup sentinels");
