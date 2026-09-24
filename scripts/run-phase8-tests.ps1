@@ -28,13 +28,13 @@ function Pass([string]$Text, [bool]$Ok) {
     if ($Ok) { Log ("PASS  " + $Text) }
     else { Log ("FAIL  " + $Text); $Failures.Add($Text) }
 }
-function Native([string]$Name, [string]$Command, [string[]]$Args) {
+function Native([string]$Name, [string]$Command, [string[]]$Arguments) {
     Section $Name
-    Log ("> " + $Command + " " + ($Args -join " "))
+    Log ("> " + $Command + " " + ($Arguments -join " "))
     $Old = $ErrorActionPreference
     try {
         $ErrorActionPreference = "Continue"
-        $Out = (& $Command @Args 2>&1 | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine
+        $Out = (& $Command @Arguments 2>&1 | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine
         $Code = $LASTEXITCODE
     } finally { $ErrorActionPreference = $Old }
     if ($Out) { Log $Out }
@@ -42,11 +42,11 @@ function Native([string]$Name, [string]$Command, [string[]]$Args) {
     if ($Code -ne 0) { $Failures.Add($Name + " failed with exit code " + $Code) }
     [pscustomobject]@{ Output = $Out; ExitCode = $Code }
 }
-function Capture([string]$Command, [string[]]$Args) {
+function Capture([string]$Command, [string[]]$Arguments) {
     $Old = $ErrorActionPreference
     try {
         $ErrorActionPreference = "Continue"
-        $Out = (& $Command @Args 2>&1 | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine
+        $Out = (& $Command @Arguments 2>&1 | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine
         $Code = $LASTEXITCODE
     } finally { $ErrorActionPreference = $Old }
     [pscustomobject]@{ Output = $Out; ExitCode = $Code }
