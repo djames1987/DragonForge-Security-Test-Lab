@@ -72,7 +72,11 @@ Phase 1 extends it with:
 - synthetic-secret artifact scanning with redaction-safe findings;
 - canonical containment for explicit diagnostic roots;
 - LabOnly read-only process-dump scanning without dump retention;
-- synthetic in-place memory lifecycle verification.
+- synthetic in-place memory lifecycle verification;
+- deterministic failure injection through synthetic writers and disposable staging roots;
+- recovery-consistency checks for interrupted writes/restores;
+- LabOnly hard-capped CPU/memory/loopback-socket stress;
+- LabOnly self-child-only process termination testing.
 
 It intentionally does not contain adversarial attack implementations through Phase 1.
 
