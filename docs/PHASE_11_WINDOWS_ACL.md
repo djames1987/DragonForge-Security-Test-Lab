@@ -35,7 +35,7 @@ The active multi-user validator:
 
 - must run on Windows;
 - must run from an elevated Administrator PowerShell session;
-- creates one temporary non-admin local user;
+- creates two temporary non-admin local users (owner and cross-user);
 - creates a disposable ACL lab root under `C:\Users\Public`;
 - never modifies live DragonForge directories;
 - never grants the temporary user administrator rights;
@@ -61,13 +61,14 @@ It requires:
 -LabAck
 ```
 
-The second account password is passed through the process environment as:
+The two synthetic account passwords are passed only through the parent process environment as:
 
 ```text
+DFSTL_PHASE11_OWNER_PASSWORD
 DFSTL_PHASE11_OTHER_PASSWORD
 ```
 
-The password is not written into evidence.
+Neither password is written into evidence.
 
 ## Restricted fixture
 
@@ -89,12 +90,16 @@ Restricted targets receive explicit ACLs for:
 
 Inheritance is disabled on the sensitive files.
 
-The temporary non-admin account is then used to attempt:
+The temporary non-admin owner account must be able to read and write `agent-session.key`.
+
+The elevated Administrator running the lab must also retain read/write access.
+
+A separate temporary non-admin account is then used to attempt:
 
 - read access to `agent-session.key`;
 - write access to `agent-session.key`.
 
-Both operations must be denied.
+Both cross-user operations must be denied.
 
 ## Inheritance regression fixture
 
