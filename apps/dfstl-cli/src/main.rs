@@ -1573,7 +1573,6 @@ fn parse_u64_arg(value: Option<&String>, name: &str) -> u64 {
     })
 }
 
-
 fn windows_acl_command(arguments: &[String]) {
     let Some(subcommand) = arguments.first() else {
         eprintln!("windows-acl requires a subcommand: analyze");
