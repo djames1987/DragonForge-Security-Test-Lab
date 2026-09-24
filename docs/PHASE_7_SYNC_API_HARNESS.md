@@ -2,7 +2,7 @@
 
 ## Status
 
-**Implementation Complete — Verification Pending**
+**Verified Complete**
 
 Phase 7 adds bounded security testing for the DragonForge Password Manager synchronization API.
 
@@ -202,13 +202,41 @@ The validator checks:
 - Safe/Controlled/LabOnly runner behavior;
 - release build.
 
-## Exit criteria
+## Verification record
 
-Phase 7 is verified when validation ends with:
+Phase 7 was locally verified on Windows on 2026-09-23 against commit:
 
 ```text
-Warnings: 0
-Failures: 0
+dc78993ebde6eccc4df1609c80a99c383b11ee73
+```
 
-PHASE 7 VALIDATION: PASS
+The release-mode validation completed with:
+
+- a clean `main` branch;
+- rustfmt passing;
+- strict Clippy passing with warnings denied;
+- 52 debug tests passing;
+- 52 release tests passing;
+- the dedicated non-state-changing sync API loopback regression passing;
+- the offline request mutation regression passing;
+- a fresh Phase 7 release CLI build succeeding;
+- protocol-v2 and loopback-only CLI capability markers passing;
+- `API-SYNC-001` registration confirmed;
+- live probe refusal without `--controlled` confirmed;
+- offline mutation refusal without `--controlled` confirmed;
+- non-loopback live target refusal confirmed;
+- the 12-case offline mutation corpus generated successfully;
+- source capture hash preserved;
+- all mutation evidence SHA-256 entries independently validated;
+- Safe runner skipping the Controlled sync API harness;
+- Controlled runner passing the sync API harness while keeping the filesystem LabOnly test skipped;
+- LabOnly runner passing all eight registered tests;
+- release workspace build succeeding;
+- zero warnings and zero failures.
+
+Validation evidence:
+
+```text
+phase7-validation-20260923-212131.log
+SHA-256: 7D27289F930DA1F739E59CEE6549CCA2CAA8514C7720ABB771030F84DB1AF5F5
 ```
