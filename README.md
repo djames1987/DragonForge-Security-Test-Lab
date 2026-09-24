@@ -6,11 +6,11 @@ DFSTL is intentionally maintained as a separate project from the product it test
 
 ## Project status
 
-**Phase 7 — Password Manager Sync/API Security Testing: Verified Complete**
+**Phase 8 — Fuzzing & Regression Corpus: Implementation Complete — Verification Pending**
 
-Phases 0 through 6 are verified complete. Phase 7 adds a Controlled Password Manager sync/API harness with bounded loopback probes and an offline captured-request mutation corpus for authentication, device authorization, replay, revisions, enrollment, and recovery boundaries.
+Phases 0 through 7 are verified complete. Phase 8 adds deterministic structure-aware fuzz corpus generation, isolated cargo-fuzz targets, crash minimization support, content-hash regression promotion, and checked-in permanent security regression fixtures.
 
-Phase 7 live probes are IPv4-loopback-only and non-state-changing. State-changing request mutations are generated offline and are never automatically transmitted.
+Phase 8 built-in fuzz generation is Controlled-class and side-effect free with respect to DragonForge targets. cargo-fuzz targets exercise bounded parser/shape logic without network or product-data side effects.
 
 ## Design principles
 
@@ -46,6 +46,8 @@ DragonForge-Security-Test-Lab/
 │   ├── PHASE_5_AGENT_HARNESS.md
 │   ├── PHASE_6_FILESYSTEM_LAB.md
 │   ├── PHASE_7_SYNC_API_HARNESS.md
+│   ├── PHASE_8_FUZZING_REGRESSION.md
+│   ├── FUZZ_CORPUS_SCHEMA.md
 │   ├── SYNC_API_MUTATION_SCHEMA.md
 │   ├── FILESYSTEM_LAB_SCHEMA.md
 │   ├── AGENT_ATTACK_SCHEMA.md
@@ -117,6 +119,25 @@ cargo run -p dfstl-cli -- target inspect --target C:\DragonForge-Test-Build --js
 DFSTL reads and hashes the explicit target; it does not execute DragonForge binaries. The current Windows package contract contains 11 expected executables.
 
 See [docs/PHASE_2_TARGET_DISCOVERY.md](docs/PHASE_2_TARGET_DISCOVERY.md) and [docs/TARGET_IDENTIFICATION_SCHEMA.md](docs/TARGET_IDENTIFICATION_SCHEMA.md).
+
+## Phase 8 fuzzing and regression corpus
+
+```powershell
+cargo run -p dfstl-cli -- fuzz corpus --target agent-json --input .\corpus\seeds\agent-json.json --output .\results\fuzz-agent-json --controlled --seed 42 --count 32
+cargo run -p dfstl-cli -- fuzz promote --target windows-path --input .\candidate.bin --regression-root .\corpus\regression --controlled --note "security invariant"
+```
+
+Phase 8 also includes an isolated `fuzz/` cargo-fuzz project with encrypted-format, Agent JSON, sync HTTP, and Windows path targets.
+
+See [docs/PHASE_8_FUZZING_REGRESSION.md](docs/PHASE_8_FUZZING_REGRESSION.md) and [docs/FUZZ_CORPUS_SCHEMA.md](docs/FUZZ_CORPUS_SCHEMA.md).
+
+## Local Phase 8 validation
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-phase8-tests.ps1 -Release
+```
+
+The validator checks deterministic corpus generation, minimization, regression promotion/no-overwrite, checked-in fixture hashes, cargo-fuzz scaffolding, SHA-256 corpus evidence, and Safe/Controlled/LabOnly runner behavior.
 
 ## Phase 7 Password Manager sync/API harness
 
