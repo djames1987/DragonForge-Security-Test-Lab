@@ -1,0 +1,5 @@
+# Phase 9 synthetic secrets only. Never replace with production credentials.
+sync-token=DFSTL-PHASE9-SYNC-TOKEN-0123456789
+recovery-kit=DFSTL-PHASE9-RECOVERY-KIT-0123456789
+otp-seed=DFSTL-PHASE9-OTP-SEED-0123456789
+device-seed=DFSTL-PHASE9-DEVICE-SEED-0123456789
