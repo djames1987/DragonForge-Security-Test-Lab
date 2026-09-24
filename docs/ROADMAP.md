@@ -110,12 +110,18 @@ Delivered:
 
 ## Phase 8 — Fuzzing and Security Regression Corpus
 
-Planned:
-- cargo-fuzz harnesses;
-- structure-aware mutators;
-- corpus management;
-- crash minimization;
-- permanent regression fixtures.
+**Status: Implementation Complete — Verification Pending**
+
+Delivered:
+- isolated cargo-fuzz project with four harnesses;
+- eight stable fuzz target domains;
+- deterministic seeded structure-aware mutators;
+- bounded corpus generation with SHA-256 manifests;
+- deterministic oracle-based crash minimizer API;
+- content-hash regression promotion with duplicate refusal;
+- permanent checked-in regression fixture and metadata;
+- seed corpus for binary, JSON, HTTP, and Windows path targets;
+- FUZZ runner registration and safety-policy integration.
 
 ## Phase 9 — Secret-Leak and Memory-Lifecycle Testing
 
