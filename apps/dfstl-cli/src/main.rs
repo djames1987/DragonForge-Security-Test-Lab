@@ -118,7 +118,7 @@ fn describe() {
     println!("cargo-fuzz-scaffold: available");
     println!(concat!(
         "active-attack-implementations: encrypted-format-mutation,",
-        "agent-loopback-harness,filesystem-lab"
+        "agent-loopback-harness,filesystem-lab,sync-api-harness,fuzz-regression-corpus"
     ));
 }
 
