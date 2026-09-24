@@ -150,7 +150,11 @@ impl RequestMutationCorpus {
         let _ = writeln!(output, "  \"source_sha256\": \"{}\",", self.source_sha256);
         let _ = writeln!(output, "  \"cases\": [");
         for (index, case) in self.cases.iter().enumerate() {
-            let comma = if index + 1 == self.cases.len() { "" } else { "," };
+            let comma = if index + 1 == self.cases.len() {
+                ""
+            } else {
+                ","
+            };
             let _ = writeln!(
                 output,
                 concat!(
@@ -693,7 +697,7 @@ fn set_header(request: &mut ParsedRequest, name: &str, value: &str) {
         .iter_mut()
         .find(|(header, _)| header.eq_ignore_ascii_case(name))
     {
-        *current = value.to_owned();
+        value.clone_into(current);
     } else {
         request.headers.push((name.to_owned(), value.to_owned()));
     }
