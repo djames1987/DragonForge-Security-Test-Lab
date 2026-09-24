@@ -148,8 +148,8 @@ impl FuzzCorpus {
             let _ = writeln!(
                 output,
                 concat!(
-                    "    {\"id\":\"{}\",\"filename\":\"{}\",",
-                    "\"sha256\":\"{}\",\"size\":{},\"mutation\":\"{}\"}{}"
+                    "    {{\"id\":\"{}\",\"filename\":\"{}\",",
+                    "\"sha256\":\"{}\",\"size\":{},\"mutation\":\"{}\"}}{}"
                 ),
                 json_escape(&case.id),
                 json_escape(&case.filename),
