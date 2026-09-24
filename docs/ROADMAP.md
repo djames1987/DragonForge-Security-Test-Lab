@@ -140,12 +140,17 @@ Delivered:
 
 ## Phase 10 — Failure Injection and Resource Exhaustion
 
-Planned:
-- controlled process termination;
-- interrupted writes/restores;
-- disk/permission failures;
-- bounded CPU/memory/socket stress;
-- recovery consistency checks.
+**Status: Implementation Complete — Verification Pending**
+
+Delivered:
+- deterministic synthetic storage-full and permission-denied writer failures;
+- interrupted atomic-write recovery consistency checks;
+- interrupted restore staging cleanup checks;
+- hard-capped CPU and memory stress;
+- bounded IPv4-loopback socket stress;
+- LabOnly DFSTL self-child termination harness;
+- failure/resource JSON evidence plus SHA-256 manifests;
+- FAULT and RESOURCE runner registrations with explicit safety boundaries.
 
 ## Phase 11 — Windows Multi-User and ACL Testing
 
