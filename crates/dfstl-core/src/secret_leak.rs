@@ -23,6 +23,7 @@ pub enum SecretLeakError {
     NoSentinels,
     RootMissing(PathBuf),
     RootIsSymlink(PathBuf),
+    NotRegularFile(PathBuf),
     ScanLimitExceeded,
     OutputExists(PathBuf),
 }
@@ -31,7 +32,9 @@ impl fmt::Display for SecretLeakError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Io(_) => f.write_str("secret-leak scanner I/O failure"),
-            Self::InvalidSentinelLine(line) => write!(f, "invalid sentinel definition on line {line}"),
+            Self::InvalidSentinelLine(line) => {
+                write!(f, "invalid sentinel definition on line {line}")
+            }
             Self::InvalidSentinelId(line) => write!(f, "invalid sentinel ID on line {line}"),
             Self::InvalidSentinelLength(line) => {
                 write!(f, "invalid sentinel value length on line {line}")
@@ -41,6 +44,9 @@ impl fmt::Display for SecretLeakError {
             Self::RootMissing(path) => write!(f, "scan root does not exist: {}", path.display()),
             Self::RootIsSymlink(path) => {
                 write!(f, "scan root must not be a symlink: {}", path.display())
+            }
+            Self::NotRegularFile(path) => {
+                write!(f, "process dump must be a regular file: {}", path.display())
             }
             Self::ScanLimitExceeded => f.write_str("secret-leak scan exceeded its safety budget"),
             Self::OutputExists(path) => {
@@ -285,6 +291,9 @@ pub fn scan_process_dump(
     })?;
     if metadata.file_type().is_symlink() {
         return Err(SecretLeakError::RootIsSymlink(dump_path.to_path_buf()));
+    }
+    if !metadata.is_file() {
+        return Err(SecretLeakError::NotRegularFile(dump_path.to_path_buf()));
     }
 
     if metadata.len() > MAX_DUMP_SCAN_BYTES {
@@ -744,6 +753,13 @@ mod tests {
 
         fs::remove_file(dump).expect("cleanup dump");
         fs::remove_file(sentinels_path).expect("cleanup sentinels");
+    }
+
+    #[test]
+    fn base64_encoder_matches_known_vector() {
+        assert_eq!(super::base64_encode(b"abc"), "YWJj");
+        assert_eq!(super::base64_encode(b"ab"), "YWI=");
+        assert_eq!(super::base64_encode(b"a"), "YQ==");
     }
 
     #[test]
