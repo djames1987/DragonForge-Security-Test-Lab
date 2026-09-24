@@ -30,10 +30,18 @@ impl fmt::Display for FailureLabError {
         match self {
             Self::Io(_) => formatter.write_str("failure-lab I/O error"),
             Self::RootExists(path) => {
-                write!(formatter, "failure-lab root already exists: {}", path.display())
+                write!(
+                    formatter,
+                    "failure-lab root already exists: {}",
+                    path.display()
+                )
             }
             Self::RootIsSymlink(path) => {
-                write!(formatter, "failure-lab root must not be a symlink: {}", path.display())
+                write!(
+                    formatter,
+                    "failure-lab root must not be a symlink: {}",
+                    path.display()
+                )
             }
             Self::InvalidBudget => {
                 formatter.write_str("resource stress budget is outside safe limits")
@@ -87,7 +95,11 @@ impl FailureInjectionReport {
         let _ = writeln!(output, "  \"all_passed\": {},", self.all_passed());
         let _ = writeln!(output, "  \"cases\": [");
         for (index, case) in self.cases.iter().enumerate() {
-            let comma = if index + 1 == self.cases.len() { "" } else { "," };
+            let comma = if index + 1 == self.cases.len() {
+                ""
+            } else {
+                ","
+            };
             let _ = writeln!(
                 output,
                 "    {{\"id\":\"{}\",\"passed\":{},\"detail\":\"{}\"}}{}",
