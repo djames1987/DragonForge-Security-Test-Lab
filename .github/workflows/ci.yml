@@ -13,7 +13,7 @@ env:
 
 jobs:
   validation:
-    name: Phase 9 Secret Leak Regression
+    name: Phase 10 Failure Resource Regression
     runs-on: ubuntu-latest
 
     steps:
@@ -38,35 +38,36 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
-      - name: Phase 9 secret leak smoke test
+      - name: Phase 10 failure/resource smoke test
         shell: pwsh
         run: |
           $Describe = cargo run -p dfstl-cli -- describe
           $Describe
-          if ($Describe -notmatch "phase: 9") { throw "Phase marker missing" }
-          if ($Describe -notmatch "synthetic-secret-sentinel-scan: available") { throw "Secret leak capability missing" }
+          if ($Describe -notmatch "phase: 10") { throw "Phase marker missing" }
+          if ($Describe -notmatch "failure-injection-lab: available") { throw "Failure capability missing" }
 
           $List = cargo run -p dfstl-cli -- list
           $List
-          if ($List -notmatch "LEAK-SENTINEL-001") { throw "LEAK test missing" }
-          if ($List -notmatch "MEMORY-LIFE-001") { throw "MEMORY test missing" }
+          if ($List -notmatch "FAULT-INJECT-001") { throw "FAULT injection test missing" }
+          if ($List -notmatch "RESOURCE-LAB-001") { throw "RESOURCE test missing" }
+          if ($List -notmatch "FAULT-KILL-001") { throw "FAULT kill test missing" }
 
-          cargo test -p dfstl-core scanner_finds_raw_hex_and_base64_without_emitting_secret_value
-          if ($LASTEXITCODE -ne 0) { throw "Secret representation regression failed" }
+          cargo test -p dfstl-core failure_injection_matrix_preserves_recovery_invariants
+          if ($LASTEXITCODE -ne 0) { throw "Failure injection regression failed" }
 
-          cargo test -p dfstl-core synthetic_memory_buffer_is_cleared_in_place
-          if ($LASTEXITCODE -ne 0) { throw "Memory lifecycle regression failed" }
+          cargo test -p dfstl-core resource_stress_is_bounded_and_completes
+          if ($LASTEXITCODE -ne 0) { throw "Resource stress regression failed" }
 
-          $Root = Join-Path $PWD "ci-phase9"
-          $Clean = Join-Path $Root "clean"
-          New-Item -ItemType Directory -Force -Path $Clean | Out-Null
-          [IO.File]::WriteAllText((Join-Path $Clean "safe.log"), "token=[REDACTED]")
+          $Root = Join-Path $PWD "ci-phase10"
+          New-Item -ItemType Directory -Force -Path $Root | Out-Null
+          cargo run -p dfstl-cli -- failure inject --root (Join-Path $Root "lab") --output (Join-Path $Root "failure") --controlled --json
+          if ($LASTEXITCODE -ne 0) { throw "Failure injection CLI failed" }
 
-          cargo run -p dfstl-cli -- secret-leak scan --root $Clean --sentinels corpus/seeds/phase9-sentinels.txt --output (Join-Path $Root "evidence") --controlled --json
-          if ($LASTEXITCODE -ne 0) { throw "Clean secret leak smoke scan failed" }
+          cargo run -p dfstl-cli -- failure resource --output (Join-Path $Root "resource") --lab-ack --cpu 2000 --memory-bytes 65536 --sockets 4 --json
+          if ($LASTEXITCODE -ne 0) { throw "Resource stress CLI failed" }
 
-          cargo run -p dfstl-cli -- run --controlled --output (Join-Path $Root "controlled")
-          if ($LASTEXITCODE -ne 0) { throw "Controlled runner regression failed" }
+          cargo run -p dfstl-cli -- failure process-termination --lab-ack --json
+          if ($LASTEXITCODE -ne 0) { throw "Self-child termination failed" }
 
-          cargo run -p dfstl-cli -- run --lab-ack --output (Join-Path $Root "lab")
+          cargo run -p dfstl-cli -- run --lab-ack --output (Join-Path $Root "lab-runner")
           if ($LASTEXITCODE -ne 0) { throw "LabOnly runner regression failed" }
