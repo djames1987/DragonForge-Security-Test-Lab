@@ -6,9 +6,9 @@ DFSTL is intentionally maintained as a separate project from the product it test
 
 ## Project status
 
-**Phase 10 — Failure, Crash & Resource Exhaustion Testing: Verified Complete**
+**Phase 11 — Windows Multi-User & ACL Security Testing: Implementation Complete — Verification Pending**
 
-Phases 0 through 9 are verified complete. Phase 10 adds deterministic injected disk/permission failures, interrupted write/restore recovery checks, bounded CPU/memory/loopback socket stress, and LabOnly DFSTL self-child termination.
+Phases 0 through 10 are verified complete. Phase 11 adds elevated disposable Windows multi-user ACL testing, real cross-user read/write probes, inherited-permission validation, and bounded ACL evidence analysis.
 
 Phase 8 built-in fuzz generation is Controlled-class and side-effect free with respect to DragonForge targets. cargo-fuzz targets exercise bounded parser/shape logic without network or product-data side effects.
 
@@ -49,6 +49,8 @@ DragonForge-Security-Test-Lab/
 │   ├── PHASE_8_FUZZING_REGRESSION.md
 │   ├── PHASE_9_SECRET_MEMORY.md
 │   ├── PHASE_10_FAILURE_RESOURCE.md
+│   ├── PHASE_11_WINDOWS_ACL.md
+│   ├── WINDOWS_ACL_SCHEMA.md
 │   ├── FAILURE_RESOURCE_SCHEMA.md
 │   ├── SECRET_LEAK_SCHEMA.md
 │   ├── FUZZ_CORPUS_SCHEMA.md
@@ -92,10 +94,10 @@ See [SAFETY.md](SAFETY.md) and [docs/TEST_TAXONOMY.md](docs/TEST_TAXONOMY.md).
 - Phase 5 — DragonForge Agent attack harness: **Verified Complete**
 - Phase 6 — Filesystem, reparse-point, and TOCTOU laboratory: **Verified Complete**
 - Phase 7 — Password Manager sync/API attack harness: **Verified Complete**
-- Phase 8 — Fuzzing and security-regression corpus
+- Phase 8 — Fuzzing and security-regression corpus: **Verified Complete**
 - Phase 9 — Secret-leak and memory-lifecycle testing: **Verified Complete**
-- Phase 10 — Failure injection and resource-exhaustion testing
-- Phase 11 — Windows multi-user and ACL security testing
+- Phase 10 — Failure injection and resource-exhaustion testing: **Verified Complete**
+- Phase 11 — Windows multi-user and ACL security testing: **Implementation Complete — Verification Pending**
 - Phase 12 — VM and multi-machine orchestration
 - Phase 13 — CI security gates and release validation
 
@@ -123,6 +125,24 @@ cargo run -p dfstl-cli -- target inspect --target C:\DragonForge-Test-Build --js
 DFSTL reads and hashes the explicit target; it does not execute DragonForge binaries. The current Windows package contract contains 11 expected executables.
 
 See [docs/PHASE_2_TARGET_DISCOVERY.md](docs/PHASE_2_TARGET_DISCOVERY.md) and [docs/TARGET_IDENTIFICATION_SCHEMA.md](docs/TARGET_IDENTIFICATION_SCHEMA.md).
+
+## Phase 11 Windows multi-user and ACL testing
+
+Run the full Phase 11 verifier from an **elevated Windows PowerShell** session:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-phase11-tests.ps1 -Release
+```
+
+The verifier creates one temporary non-admin local account, applies explicit ACLs to a disposable DragonForge-shaped lab under `C:\Users\Public`, performs real cross-user read/write probes, captures an ACL snapshot, validates an intentionally unsafe inherited ACL fixture, and removes the temporary account/lab state during cleanup.
+
+Offline ACL evidence can be analyzed with:
+
+```powershell
+cargo run -p dfstl-cli -- windows-acl analyze --input .\acl-snapshot.tsv --output .\results\phase11-acl --lab-ack
+```
+
+See [docs/PHASE_11_WINDOWS_ACL.md](docs/PHASE_11_WINDOWS_ACL.md) and [docs/WINDOWS_ACL_SCHEMA.md](docs/WINDOWS_ACL_SCHEMA.md).
 
 ## Phase 10 failure injection and resource exhaustion
 
