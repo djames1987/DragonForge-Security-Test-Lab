@@ -202,7 +202,7 @@ try {
     $Dump = Capture $Cli @("secret-leak","dump-scan","--dump",$DumpPath,"--sentinels",$Sentinels,"--output",$DumpOut,"--lab-ack","--json")
     Log $Dump.Output
     Pass "dump scan detects synthetic sentinel" ($Dump.ExitCode -eq 1)
-    Pass "dump scan scope is process-dump" ($Dump.Output -match '"scope":"process-dump"')
+    Pass "dump scan scope is process-dump" ($Dump.Output -match '"scope"\s*:\s*"process-dump"')
     Pass "dump scan detects UTF-16LE representation" ($Dump.Output -match '"representation":"utf16le"')
     Pass "dump scan does not echo sentinel value" (-not $Dump.Output.Contains($RawSecret))
     Pass "evidence does not copy dump" (-not (Test-Path -LiteralPath (Join-Path $DumpOut "synthetic.dmp")))
