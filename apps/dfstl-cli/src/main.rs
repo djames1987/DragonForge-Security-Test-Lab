@@ -110,7 +110,9 @@ fn describe() {
     println!("sync-api-live-target: ipv4-loopback-only");
     println!("sync-api-request-mutation: offline-only");
     println!("deterministic-fuzz-corpus: available");
-    println!("fuzz-targets: dfvault,dfbackup,dfshare,dfauth,password-manager-json,agent-json,sync-http,windows-path");
+    println!(
+        "fuzz-targets: dfvault,dfbackup,dfshare,dfauth,password-manager-json,agent-json,sync-http,windows-path"
+    );
     println!("fuzz-regression-promotion: available");
     println!("fuzz-minimizer-api: available");
     println!("cargo-fuzz-scaffold: available");
@@ -987,7 +989,7 @@ fn fuzz_corpus_command(arguments: &[String]) {
         eprintln!("fuzz corpus requires --target NAME");
         std::process::exit(2);
     };
-    let target = FuzzTarget::parse(&target).unwrap_or_else(|error| {
+    let target = FuzzTarget::from_name(&target).unwrap_or_else(|error| {
         eprintln!("fuzz target failed: {error}");
         std::process::exit(2);
     });
@@ -1055,7 +1057,9 @@ fn fuzz_promote_command(arguments: &[String]) {
     }
 
     if !controlled {
-        eprintln!("fuzz regression promotion is Controlled-class; rerun with explicit --controlled");
+        eprintln!(
+            "fuzz regression promotion is Controlled-class; rerun with explicit --controlled"
+        );
         std::process::exit(6);
     }
 
@@ -1122,7 +1126,9 @@ fn help() {
     println!("    --output PATH --controlled [--json]");
     println!("  fuzz corpus --target NAME        Generate deterministic structure-aware corpus");
     println!("    --input PATH --output PATH --controlled [--seed N] [--count N] [--json]");
-    println!("  fuzz promote --target NAME       Promote candidate into permanent regression corpus");
+    println!(
+        "  fuzz promote --target NAME       Promote candidate into permanent regression corpus"
+    );
     println!("    --input PATH --regression-root PATH --controlled [--note TEXT] [--json]");
     println!("  version                          Show the CLI version");
     println!("  help                 Show this help");
