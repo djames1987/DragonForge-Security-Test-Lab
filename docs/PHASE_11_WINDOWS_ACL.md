@@ -132,6 +132,16 @@ The Rust analyzer is bounded to:
 - 2,048 path characters;
 - 256 owner/principal characters.
 
+## Read-only live DragonForge ACL capture
+
+A real installation can be inspected without modifying it:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\capture-phase11-dragonforge-acls.ps1 -Output .\dragonforge-acls.tsv
+```
+
+The capture utility checks the known Agent paths under `%LOCALAPPDATA%` and privileged-service paths under `%ProgramData%`. It records only ACL metadata for targets that currently exist and does not change permissions.
+
 ## ACL analysis
 
 Run:
