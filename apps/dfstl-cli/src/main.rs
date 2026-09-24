@@ -12,12 +12,12 @@ use dfstl_core::{
     ExecutionPolicy, ExternalToolStatus, FuzzTarget, PackageManifestStatus, Runner, SafetyClass,
     SecurityTest, TargetError, TestCategory, TestContext, TestDescriptor, TestExecution,
     TestRegistry, generate_fuzz_corpus, generate_mutation_corpus, generate_runtime_mutation_corpus,
-    generate_sync_request_mutations, inspect_target, load_sentinels, path_policy_corpus,
-    promote_regression_fixture, resolve_target, run_agent_attack_harness,
-    run_bounded_resource_stress, run_external_scanners, run_failure_injection_lab,
-    run_filesystem_lab, run_sync_api_probe, scan_artifact_roots, scan_process_dump, scan_source,
-    synthetic_memory_lifecycle_check, write_failure_bundle, write_scan_bundle,
-    write_secret_leak_bundle,
+    analyze_acl_records, generate_sync_request_mutations, inspect_target, load_sentinels,
+    parse_acl_snapshot, path_policy_corpus, promote_regression_fixture, resolve_target,
+    run_agent_attack_harness, run_bounded_resource_stress, run_external_scanners,
+    run_failure_injection_lab, run_filesystem_lab, run_sync_api_probe, scan_artifact_roots,
+    scan_process_dump, scan_source, synthetic_memory_lifecycle_check, write_acl_bundle,
+    write_failure_bundle, write_scan_bundle, write_secret_leak_bundle,
 };
 
 fn main() {
@@ -67,6 +67,10 @@ fn main() {
             let arguments: Vec<String> = args.collect();
             failure_command(&arguments);
         }
+        "windows-acl" => {
+            let arguments: Vec<String> = args.collect();
+            windows_acl_command(&arguments);
+        }
         "__phase10-worker" => phase10_worker(),
         "version" | "--version" | "-V" => {
             println!("dfstl {}", env!("CARGO_PKG_VERSION"));
@@ -83,7 +87,7 @@ fn main() {
 fn describe() {
     let policy = ExecutionPolicy::default();
     println!("DragonForge Security Test Lab");
-    println!("phase: 10");
+    println!("phase: 11");
     println!("default-safety-policy: {}", policy.maximum_class());
     println!(
         "controlled-allowed-by-default: {}",
@@ -145,10 +149,16 @@ fn describe() {
     println!("resource-stress-safety-class: lab-only");
     println!("self-child-termination: available");
     println!("process-termination-safety-class: lab-only");
+    println!("windows-acl-analysis: available");
+    println!("windows-multi-user-acl-lab: available");
+    println!("windows-acl-safety-class: lab-only");
+    println!("acl-cross-user-probes: read,write");
+    println!("acl-inheritance-validation: available");
     println!(concat!(
         "active-attack-implementations: encrypted-format-mutation,",
         "agent-loopback-harness,filesystem-lab,sync-api-harness,fuzz-regression-corpus,",
-        "secret-leak-scan,memory-dump-scan,failure-injection,resource-stress,self-child-kill"
+        "secret-leak-scan,memory-dump-scan,failure-injection,resource-stress,self-child-kill,",
+        "windows-multi-user-acl"
     ));
 }
 
@@ -195,6 +205,9 @@ fn registry() -> TestRegistry {
         .expect("static built-in test ID must be valid");
     registry
         .register(ProcessTerminationSelfCheck)
+        .expect("static built-in test ID must be valid");
+    registry
+        .register(WindowsAclSelfCheck)
         .expect("static built-in test ID must be valid");
     registry
 }
@@ -1560,13 +1573,92 @@ fn parse_u64_arg(value: Option<&String>, name: &str) -> u64 {
     })
 }
 
+
+fn windows_acl_command(arguments: &[String]) {
+    let Some(subcommand) = arguments.first() else {
+        eprintln!("windows-acl requires a subcommand: analyze");
+        std::process::exit(2);
+    };
+
+    match subcommand.as_str() {
+        "analyze" => windows_acl_analyze_command(&arguments[1..]),
+        other => {
+            eprintln!("unknown windows-acl subcommand: {other}");
+            std::process::exit(2);
+        }
+    }
+}
+
+fn windows_acl_analyze_command(arguments: &[String]) {
+    let mut input = None;
+    let mut output = None;
+    let mut lab_ack = false;
+    let mut json = false;
+    let mut index = 0_usize;
+
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--input" => {
+                index += 1;
+                input = arguments.get(index).map(PathBuf::from);
+            }
+            "--output" => {
+                index += 1;
+                output = arguments.get(index).map(PathBuf::from);
+            }
+            "--lab-ack" => lab_ack = true,
+            "--json" => json = true,
+            unknown => {
+                eprintln!("unknown windows-acl analyze option: {unknown}");
+                std::process::exit(2);
+            }
+        }
+        index += 1;
+    }
+
+    if !lab_ack {
+        eprintln!("Windows ACL analysis is LabOnly; rerun with explicit --lab-ack");
+        std::process::exit(7);
+    }
+    let Some(input) = input else {
+        eprintln!("windows-acl analyze requires --input PATH");
+        std::process::exit(2);
+    };
+    let Some(output) = output else {
+        eprintln!("windows-acl analyze requires --output PATH");
+        std::process::exit(2);
+    };
+
+    let records = parse_acl_snapshot(&input).unwrap_or_else(|error| {
+        eprintln!("ACL snapshot parsing failed: {error}");
+        std::process::exit(3);
+    });
+    let report = analyze_acl_records(&records);
+    write_acl_bundle(&output, &report).unwrap_or_else(|error| {
+        eprintln!("ACL analysis evidence write failed: {error}");
+        std::process::exit(3);
+    });
+
+    if json {
+        print!("{}", report.to_json_pretty());
+    } else {
+        println!("DragonForge Windows ACL analysis");
+        println!("Records: {}", report.records);
+        println!("Findings: {}", report.findings.len());
+        println!("Evidence directory: {}", output.display());
+    }
+    if !report.clean() {
+        std::process::exit(1);
+    }
+}
+
 fn help() {
     println!("DragonForge Security Test Lab");
     println!();
     println!("Usage: dfstl <command>");
     println!();
     println!("Commands:");
-    println!("  describe                         Show the Phase 10 runtime model");
+    println!("  describe                         Show the Phase 11 runtime model");
     println!("  list                             List registered built-in tests");
     println!("  run [--output PATH] [--controlled] [--lab-ack]");
     println!(
@@ -1608,6 +1700,8 @@ fn help() {
     println!("    --output PATH --lab-ack [--cpu N] [--memory-bytes N] [--sockets N] [--json]");
     println!("  failure process-termination     Spawn and terminate a DFSTL self-child only");
     println!("    --lab-ack [--json]");
+    println!("  windows-acl analyze              Analyze a Phase 11 ACL snapshot");
+    println!("    --input PATH --output PATH --lab-ack [--json]");
     println!("  version                          Show the CLI version");
     println!("  help                 Show this help");
 }
@@ -2002,6 +2096,33 @@ impl SecurityTest for ProcessTerminationSelfCheck {
         }
         Ok(TestExecution::pass(
             "self-child-only process termination harness is explicitly authorized",
+        ))
+    }
+}
+
+struct WindowsAclSelfCheck;
+
+impl SecurityTest for WindowsAclSelfCheck {
+    fn descriptor(&self) -> &TestDescriptor {
+        static DESCRIPTOR: TestDescriptor = TestDescriptor::new(
+            "ACL-WINDOWS-001",
+            "Windows multi-user and ACL boundary testing capability",
+            TestCategory::AccessControl,
+            SafetyClass::LabOnly,
+            ExecutionModel::Hybrid,
+        );
+        &DESCRIPTOR
+    }
+
+    fn execute(&self, context: &TestContext<'_>) -> Result<TestExecution, String> {
+        if !context.policy.allows(SafetyClass::LabOnly) {
+            return Ok(TestExecution::new(
+                dfstl_core::TestStatus::Fail,
+                "LabOnly Windows ACL testing executed without LabOnly policy",
+            ));
+        }
+        Ok(TestExecution::pass(
+            "Windows multi-user ACL and cross-user access testing is explicitly authorized",
         ))
     }
 }
