@@ -1340,7 +1340,9 @@ fn help() {
         "  fuzz promote --target NAME       Promote candidate into permanent regression corpus"
     );
     println!("    --input PATH --regression-root PATH --controlled [--note TEXT] [--json]");
-    println!("  secret-leak scan --root PATH     Scan explicit artifact roots for synthetic secrets");
+    println!(
+        "  secret-leak scan --root PATH     Scan explicit artifact roots for synthetic secrets"
+    );
     println!("    [--root PATH ...] --sentinels PATH --output PATH --controlled [--json]");
     println!("  secret-leak dump-scan            Scan one explicit offline process dump");
     println!("    --dump PATH --sentinels PATH --output PATH --lab-ack [--json]");
