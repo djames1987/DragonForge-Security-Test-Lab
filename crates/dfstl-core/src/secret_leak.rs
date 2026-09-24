@@ -55,7 +55,11 @@ impl fmt::Display for SecretLeakError {
             }
             Self::ScanLimitExceeded => f.write_str("secret-leak scan exceeded its safety budget"),
             Self::OutputExists(path) => {
-                write!(f, "secret-leak evidence output already exists: {}", path.display())
+                write!(
+                    f,
+                    "secret-leak evidence output already exists: {}",
+                    path.display()
+                )
             }
         }
     }
@@ -177,16 +181,17 @@ impl SecretLeakReport {
         let _ = writeln!(output, "Roots: {}", self.roots_scanned);
         let _ = writeln!(output, "Files: {}", self.files_scanned);
         let _ = writeln!(output, "Bytes: {}", self.bytes_scanned);
-        let _ = writeln!(output, "Oversized skipped: {}", self.skipped_oversized_files);
+        let _ = writeln!(
+            output,
+            "Oversized skipped: {}",
+            self.skipped_oversized_files
+        );
         let _ = writeln!(output, "Findings: {}", self.findings.len());
         for finding in &self.findings {
             let _ = writeln!(
                 output,
                 "{}  {}  {}  offset={}",
-                finding.sentinel_id,
-                finding.relative_path,
-                finding.representation,
-                finding.offset
+                finding.sentinel_id, finding.relative_path, finding.representation, finding.offset
             );
         }
         output
@@ -269,13 +274,7 @@ pub fn scan_artifact_roots(
             scan_one_file(root, root, sentinels, &mut state)?;
         } else if metadata.is_dir() {
             let canonical_root = fs::canonicalize(root)?;
-            scan_directory(
-                root,
-                &canonical_root,
-                root,
-                sentinels,
-                &mut state,
-            )?;
+            scan_directory(root, &canonical_root, root, sentinels, &mut state)?;
         }
     }
     Ok(state.finish())
@@ -435,29 +434,24 @@ fn scan_dump_file(
         let mut window = Vec::with_capacity(overlap.len() + count);
         window.extend_from_slice(&overlap);
         window.extend_from_slice(&buffer[..count]);
-        let base_offset = chunk_start.saturating_sub(
-            u64::try_from(overlap.len()).unwrap_or(u64::MAX),
-        );
+        let base_offset =
+            chunk_start.saturating_sub(u64::try_from(overlap.len()).unwrap_or(u64::MAX));
 
         for (sentinel_id, variant) in &variants {
             for offset in find_all(&window, &variant.bytes) {
-                let absolute = base_offset.saturating_add(
-                    u64::try_from(offset).unwrap_or(u64::MAX),
-                );
-                if absolute.saturating_add(
-                    u64::try_from(variant.bytes.len()).unwrap_or(u64::MAX),
-                ) <= chunk_start
+                let absolute =
+                    base_offset.saturating_add(u64::try_from(offset).unwrap_or(u64::MAX));
+                if absolute.saturating_add(u64::try_from(variant.bytes.len()).unwrap_or(u64::MAX))
+                    <= chunk_start
                 {
                     continue;
                 }
                 state.findings.push(LeakFinding {
                     sentinel_id: sentinel_id.clone(),
-                    relative_path: path
-                        .file_name()
-                        .map_or_else(
-                            || "process.dmp".to_owned(),
-                            |name| name.to_string_lossy().into_owned(),
-                        ),
+                    relative_path: path.file_name().map_or_else(
+                        || "process.dmp".to_owned(),
+                        |name| name.to_string_lossy().into_owned(),
+                    ),
                     representation: variant.label.to_owned(),
                     offset: usize::try_from(absolute).unwrap_or(usize::MAX),
                 });
@@ -489,9 +483,7 @@ fn scan_one_file(
         state.skipped_oversized_files += 1;
         return Ok(());
     }
-    if state
-        .bytes_scanned
-        .saturating_add(metadata.len())
+    if state.bytes_scanned.saturating_add(metadata.len())
         > u64::try_from(MAX_TOTAL_SCAN_BYTES).unwrap_or(u64::MAX)
     {
         return Err(SecretLeakError::ScanLimitExceeded);
@@ -508,8 +500,10 @@ fn scan_one_file(
         .to_string_lossy()
         .replace('\\', "/");
     let display_path = if relative_path.is_empty() {
-        path.file_name()
-            .map_or_else(|| ".".to_owned(), |name| name.to_string_lossy().into_owned())
+        path.file_name().map_or_else(
+            || ".".to_owned(),
+            |name| name.to_string_lossy().into_owned(),
+        )
     } else {
         relative_path
     };
@@ -592,7 +586,9 @@ fn find_all(haystack: &[u8], needle: &[u8]) -> Vec<usize> {
 fn contains_bytes(haystack: &[u8], needle: &[u8]) -> bool {
     !needle.is_empty()
         && needle.len() <= haystack.len()
-        && haystack.windows(needle.len()).any(|window| window == needle)
+        && haystack
+            .windows(needle.len())
+            .any(|window| window == needle)
 }
 
 fn hex_encode(bytes: &[u8]) -> String {
@@ -606,8 +602,7 @@ fn hex_encode(bytes: &[u8]) -> String {
 }
 
 fn base64_encode(bytes: &[u8]) -> String {
-    const TABLE: &[u8; 64] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut output = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for chunk in bytes.chunks(3) {
         let first = u32::from(chunk[0]);
@@ -732,14 +727,11 @@ mod tests {
         fs::write(root.join("base64.log"), super::base64_encode(value)).expect("base64");
         fs::write(root.join("utf16.log"), super::utf16le_ascii(value)).expect("utf16");
 
-        let report = scan_artifact_roots(&[root.clone()], &sentinels).expect("scan");
+        let report = scan_artifact_roots(std::slice::from_ref(&root), &sentinels).expect("scan");
         assert_eq!(report.findings.len(), 4);
         let json = report.to_json_pretty();
         assert!(!json.contains("DFSTL-SYNTHETIC-TOKEN-1234567890"));
-        assert!(
-            format!("{:?}", sentinels.first().expect("sentinel"))
-                .contains("[REDACTED]")
-        );
+        assert!(format!("{:?}", sentinels.first().expect("sentinel")).contains("[REDACTED]"));
 
         fs::remove_dir_all(root).expect("cleanup root");
         fs::remove_file(sentinels_path).expect("cleanup sentinels");
@@ -754,7 +746,7 @@ mod tests {
         fs::write(&sentinels_path, "secret=DFSTL-NOT-PRESENT-1234567890\n").expect("sentinels");
         fs::write(root.join("safe.log"), "redacted diagnostic content").expect("safe");
         let sentinels = load_sentinels(&sentinels_path).expect("load");
-        let report = scan_artifact_roots(&[root.clone()], &sentinels).expect("scan");
+        let report = scan_artifact_roots(std::slice::from_ref(&root), &sentinels).expect("scan");
         assert!(report.clean());
         write_secret_leak_bundle(&output, &report).expect("evidence");
         assert!(output.join("SHA256SUMS").is_file());
