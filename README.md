@@ -6,9 +6,9 @@ DFSTL is intentionally maintained as a separate project from the product it test
 
 ## Project status
 
-**Phase 8 — Fuzzing & Regression Corpus: Verified Complete**
+**Phase 9 — Secret Leak & Memory Security Testing: Implementation Complete — Verification Pending**
 
-Phases 0 through 7 are verified complete. Phase 8 adds deterministic structure-aware fuzz corpus generation, isolated cargo-fuzz targets, crash minimization support, content-hash regression promotion, and checked-in permanent security regression fixtures.
+Phases 0 through 8 are verified complete. Phase 9 adds synthetic sentinel leak scanning for explicit diagnostic/AppData/temp/support roots, redaction-safe evidence, controlled in-place lifecycle checks, and LabOnly offline process-dump analysis.
 
 Phase 8 built-in fuzz generation is Controlled-class and side-effect free with respect to DragonForge targets. cargo-fuzz targets exercise bounded parser/shape logic without network or product-data side effects.
 
@@ -47,6 +47,8 @@ DragonForge-Security-Test-Lab/
 │   ├── PHASE_6_FILESYSTEM_LAB.md
 │   ├── PHASE_7_SYNC_API_HARNESS.md
 │   ├── PHASE_8_FUZZING_REGRESSION.md
+│   ├── PHASE_9_SECRET_MEMORY.md
+│   ├── SECRET_LEAK_SCHEMA.md
 │   ├── FUZZ_CORPUS_SCHEMA.md
 │   ├── SYNC_API_MUTATION_SCHEMA.md
 │   ├── FILESYSTEM_LAB_SCHEMA.md
@@ -89,7 +91,7 @@ See [SAFETY.md](SAFETY.md) and [docs/TEST_TAXONOMY.md](docs/TEST_TAXONOMY.md).
 - Phase 6 — Filesystem, reparse-point, and TOCTOU laboratory: **Verified Complete**
 - Phase 7 — Password Manager sync/API attack harness: **Verified Complete**
 - Phase 8 — Fuzzing and security-regression corpus
-- Phase 9 — Secret-leak and memory-lifecycle testing
+- Phase 9 — Secret-leak and memory-lifecycle testing: **Implementation Complete — Verification Pending**
 - Phase 10 — Failure injection and resource-exhaustion testing
 - Phase 11 — Windows multi-user and ACL security testing
 - Phase 12 — VM and multi-machine orchestration
@@ -119,6 +121,31 @@ cargo run -p dfstl-cli -- target inspect --target C:\DragonForge-Test-Build --js
 DFSTL reads and hashes the explicit target; it does not execute DragonForge binaries. The current Windows package contract contains 11 expected executables.
 
 See [docs/PHASE_2_TARGET_DISCOVERY.md](docs/PHASE_2_TARGET_DISCOVERY.md) and [docs/TARGET_IDENTIFICATION_SCHEMA.md](docs/TARGET_IDENTIFICATION_SCHEMA.md).
+
+## Phase 9 secret leak and memory lifecycle testing
+
+```powershell
+cargo run -p dfstl-cli -- secret-leak scan --root .\diagnostics --sentinels .\corpus\seeds\phase9-sentinels.txt --output .\results\phase9-scan --controlled
+cargo run -p dfstl-cli -- secret-leak memory-check --controlled
+```
+
+Offline process-dump analysis is LabOnly:
+
+```powershell
+cargo run -p dfstl-cli -- secret-leak dump-scan --dump C:\lab\process.dmp --sentinels .\corpus\seeds\phase9-sentinels.txt --output .\results\phase9-dump --lab-ack
+```
+
+Reports detect raw, hex, Base64, and UTF-16LE forms but never serialize sentinel values or dump contents.
+
+See [docs/PHASE_9_SECRET_MEMORY.md](docs/PHASE_9_SECRET_MEMORY.md) and [docs/SECRET_LEAK_SCHEMA.md](docs/SECRET_LEAK_SCHEMA.md).
+
+## Local Phase 9 validation
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-phase9-tests.ps1 -Release
+```
+
+The validator proves both clean-artifact behavior and intentional leak detection, verifies redaction-safe evidence hashes, exercises offline dump scanning, and checks Safe/Controlled/LabOnly policy boundaries.
 
 ## Phase 8 fuzzing and regression corpus
 
