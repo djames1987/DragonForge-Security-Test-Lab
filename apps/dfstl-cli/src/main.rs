@@ -1528,7 +1528,11 @@ fn failure_process_termination_command(arguments: &[String]) {
 
     if json {
         println!(
-            "{{\"schema_version\":1,\"target\":\"self-child\",\"running_before_kill\":{running},\"kill_requested\":{killed},\"wait_completed\":{waited},\"passed\":{passed}}}"
+            concat!(
+                "{{\"schema_version\":1,\"target\":\"self-child\",",
+                "\"running_before_kill\":{running},\"kill_requested\":{killed},",
+                "\"wait_completed\":{waited},\"passed\":{passed}}}"
+            )
         );
     } else {
         println!("self-child-termination: {}", if passed { "pass" } else { "fail" });
