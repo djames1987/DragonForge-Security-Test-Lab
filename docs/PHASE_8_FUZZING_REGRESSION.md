@@ -2,7 +2,7 @@
 
 ## Status
 
-**Implementation Complete — Verification Pending**
+**Verified Complete**
 
 Phase 8 adds deterministic structure-aware fuzz corpus generation, cargo-fuzz targets, crash minimization support, and permanent regression promotion.
 
@@ -190,13 +190,43 @@ The validator checks:
 - Safe/Controlled/LabOnly runner behavior;
 - release build.
 
-## Exit criteria
+## Verification record
 
-Phase 8 is verified when the local validator ends with:
+Phase 8 was locally verified on Windows on 2026-09-23 against commit:
 
 ```text
-Warnings: 0
-Failures: 0
+8003097fff00f3f3a345ac5051a49ff085ec3d37
+```
 
-PHASE 8 VALIDATION: PASS
+The release-mode validation completed with:
+
+- a clean `main` branch;
+- rustfmt passing;
+- strict Clippy passing with warnings denied;
+- 56 debug tests passing;
+- 56 release tests passing;
+- deterministic same-seed corpus regression passing;
+- fuzz minimizer regression passing;
+- regression-promotion/no-overwrite regression passing;
+- a fresh Phase 8 release CLI build succeeding;
+- Phase 8 capability markers and `FUZZ-CORPUS-001` registration confirmed;
+- Controlled refusal without `--controlled` confirmed;
+- deterministic 24-case CLI corpus generation passing;
+- source seed hash preserved;
+- every generated SHA-256 manifest entry independently validated;
+- regression promotion and duplicate refusal passing;
+- source candidate hash preserved;
+- checked-in permanent regression fixture and metadata validated;
+- all four cargo-fuzz targets registered;
+- Safe runner skipping the Controlled fuzz capability;
+- Controlled runner passing the fuzz capability while keeping the filesystem LabOnly test skipped;
+- LabOnly runner passing all nine registered tests;
+- release workspace build succeeding;
+- zero warnings and zero failures.
+
+Validation evidence:
+
+```text
+phase8-validation-20260923-215531.log
+SHA-256: C0E110228DCB3C52A49D88495E032E34D023C1747E53D47541F23BD166062FD0
 ```
