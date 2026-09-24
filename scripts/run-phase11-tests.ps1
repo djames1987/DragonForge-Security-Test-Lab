@@ -165,22 +165,29 @@ try {
     Log $Denied.Output
     Pass "ACL analysis without --lab-ack is refused" ($Denied.ExitCode -eq 7)
 
-    Section "Temporary non-admin account"
-    $SecurePassword = ConvertTo-SecureString $TempPassword -AsPlainText -Force
-    New-LocalUser -Name $TempUserName -Password $SecurePassword -AccountNeverExpires -PasswordNeverExpires -Description "Temporary DFSTL Phase 11 ACL test account" | Out-Null
-    $TempUserCreated = $true
-    $LocalUser = Get-LocalUser -Name $TempUserName
-    Pass "temporary local user exists" ($null -ne $LocalUser)
-    $AdminMember = Get-LocalGroupMember -Group "Administrators" | Where-Object {
-        $_.SID -eq $LocalUser.SID
-    }
-    Pass "temporary user is not an Administrator" ($null -eq $AdminMember)
+    Section "Temporary non-admin accounts"
+    $OwnerSecurePassword = ConvertTo-SecureString $OwnerPassword -AsPlainText -Force
+    $OtherSecurePassword = ConvertTo-SecureString $OtherPassword -AsPlainText -Force
+    New-LocalUser -Name $OwnerUserName -Password $OwnerSecurePassword -AccountNeverExpires -PasswordNeverExpires -Description "Temporary DFSTL Phase 11 owner account" | Out-Null
+    $OwnerUserCreated = $true
+    New-LocalUser -Name $OtherUserName -Password $OtherSecurePassword -AccountNeverExpires -PasswordNeverExpires -Description "Temporary DFSTL Phase 11 cross-user account" | Out-Null
+    $OtherUserCreated = $true
+
+    $OwnerLocalUser = Get-LocalUser -Name $OwnerUserName
+    $OtherLocalUser = Get-LocalUser -Name $OtherUserName
+    Pass "temporary owner user exists" ($null -ne $OwnerLocalUser)
+    Pass "temporary cross-user exists" ($null -ne $OtherLocalUser)
+
+    $AdminSids = @(Get-LocalGroupMember -Group "Administrators" | ForEach-Object { $_.SID.Value })
+    Pass "temporary owner is not an Administrator" (-not ($AdminSids -contains $OwnerLocalUser.SID.Value))
+    Pass "temporary cross-user is not an Administrator" (-not ($AdminSids -contains $OtherLocalUser.SID.Value))
 
     New-Item -ItemType Directory -Force -Path $RunRoot | Out-Null
     $LabOutput = Join-Path $RunRoot "active-lab"
-    $env:DFSTL_PHASE11_OTHER_PASSWORD = $TempPassword
-    $OwnerUser = [Security.Principal.WindowsIdentity]::GetCurrent().Name
-    $OtherUser = "$env:COMPUTERNAME\$TempUserName"
+    $env:DFSTL_PHASE11_OWNER_PASSWORD = $OwnerPassword
+    $env:DFSTL_PHASE11_OTHER_PASSWORD = $OtherPassword
+    $OwnerUser = "$env:COMPUTERNAME\$OwnerUserName"
+    $OtherUser = "$env:COMPUTERNAME\$OtherUserName"
 
     Section "Active multi-user ACL lab"
     $Lab = Capture "powershell.exe" @(
