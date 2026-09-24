@@ -362,7 +362,11 @@ pub fn promote_regression_fixture(
 pub fn exercise_fuzz_input(target: FuzzTarget, data: &[u8]) -> u64 {
     match target {
         FuzzTarget::WindowsPath => std::str::from_utf8(data).map_or(0, |value| {
-            u64::from(crate::filesystem_lab::validate_windows_relative_path(value).is_ok())
+            if crate::filesystem_lab::validate_windows_relative_path(value).is_ok() {
+                1
+            } else {
+                0
+            }
         }),
         FuzzTarget::SyncHttp => exercise_http_shape(data),
         FuzzTarget::AgentJson | FuzzTarget::PasswordManagerJson => exercise_json_shape(data),
@@ -529,7 +533,7 @@ fn structure_separator_mutation(target: FuzzTarget, seed: &[u8]) -> (Vec<u8>, St
             (bytes, "path-empty-traversal-segments".to_owned())
         }
         _ => {
-            bytes.splice(0..0, [0_u8; 8]);
+            drop(bytes.splice(0..0, [0_u8; 8]));
             (bytes, "binary-zero-prefix".to_owned())
         }
     }
