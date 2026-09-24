@@ -6,9 +6,9 @@ DFSTL is intentionally maintained as a separate project from the product it test
 
 ## Project status
 
-**Phase 9 — Secret Leak & Memory Security Testing: Verified Complete**
+**Phase 10 — Failure, Crash & Resource Exhaustion Testing: Implementation Complete — Verification Pending**
 
-Phases 0 through 8 are verified complete. Phase 9 adds synthetic sentinel leak scanning for explicit diagnostic/AppData/temp/support roots, redaction-safe evidence, controlled in-place lifecycle checks, and LabOnly offline process-dump analysis.
+Phases 0 through 9 are verified complete. Phase 10 adds deterministic injected disk/permission failures, interrupted write/restore recovery checks, bounded CPU/memory/loopback socket stress, and LabOnly DFSTL self-child termination.
 
 Phase 8 built-in fuzz generation is Controlled-class and side-effect free with respect to DragonForge targets. cargo-fuzz targets exercise bounded parser/shape logic without network or product-data side effects.
 
@@ -48,6 +48,8 @@ DragonForge-Security-Test-Lab/
 │   ├── PHASE_7_SYNC_API_HARNESS.md
 │   ├── PHASE_8_FUZZING_REGRESSION.md
 │   ├── PHASE_9_SECRET_MEMORY.md
+│   ├── PHASE_10_FAILURE_RESOURCE.md
+│   ├── FAILURE_RESOURCE_SCHEMA.md
 │   ├── SECRET_LEAK_SCHEMA.md
 │   ├── FUZZ_CORPUS_SCHEMA.md
 │   ├── SYNC_API_MUTATION_SCHEMA.md
@@ -121,6 +123,26 @@ cargo run -p dfstl-cli -- target inspect --target C:\DragonForge-Test-Build --js
 DFSTL reads and hashes the explicit target; it does not execute DragonForge binaries. The current Windows package contract contains 11 expected executables.
 
 See [docs/PHASE_2_TARGET_DISCOVERY.md](docs/PHASE_2_TARGET_DISCOVERY.md) and [docs/TARGET_IDENTIFICATION_SCHEMA.md](docs/TARGET_IDENTIFICATION_SCHEMA.md).
+
+## Phase 10 failure injection and resource exhaustion
+
+```powershell
+cargo run -p dfstl-cli -- failure inject --root .\results\phase10-lab --output .\results\phase10-failure --controlled
+cargo run -p dfstl-cli -- failure resource --output .\results\phase10-resource --lab-ack
+cargo run -p dfstl-cli -- failure process-termination --lab-ack
+```
+
+The fault matrix uses synthetic writers and disposable staging roots. Resource stress is hard-capped, uses loopback sockets only, and process termination targets only a DFSTL self-child worker.
+
+See [docs/PHASE_10_FAILURE_RESOURCE.md](docs/PHASE_10_FAILURE_RESOURCE.md) and [docs/FAILURE_RESOURCE_SCHEMA.md](docs/FAILURE_RESOURCE_SCHEMA.md).
+
+## Local Phase 10 validation
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-phase10-tests.ps1 -Release
+```
+
+The validator checks failure/recovery consistency, SHA-256 evidence, over-budget refusal, bounded CPU/memory/socket stress, self-child termination, and Safe/Controlled/LabOnly policy boundaries.
 
 ## Phase 9 secret leak and memory lifecycle testing
 
