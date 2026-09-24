@@ -12,6 +12,7 @@ pub mod runner;
 pub mod secret_leak;
 pub mod static_scan;
 pub mod sync_api;
+pub mod windows_acl;
 pub mod target;
 
 pub use agent_harness::{
@@ -69,6 +70,11 @@ pub use sync_api::{
 pub use target::{
     BuildInfo, EXPECTED_EXECUTABLES, PackageManifestStatus, TargetError, TargetExecutable,
     TargetInspection, discover_candidates, inspect_target, resolve_target,
+};
+pub use windows_acl::{
+    AclAnalysisReport, AclFinding, AclLabError, AclRecord, MAX_ACL_PATH_CHARS,
+    MAX_ACL_PRINCIPAL_CHARS, MAX_ACL_RECORDS, analyze_acl_records, parse_acl_snapshot,
+    write_acl_bundle,
 };
 
 #[cfg(test)]
