@@ -1530,9 +1530,13 @@ fn failure_process_termination_command(arguments: &[String]) {
         println!(
             concat!(
                 "{{\"schema_version\":1,\"target\":\"self-child\",",
-                "\"running_before_kill\":{running},\"kill_requested\":{killed},",
-                "\"wait_completed\":{waited},\"passed\":{passed}}}"
-            )
+                "\"running_before_kill\":{},\"kill_requested\":{},",
+                "\"wait_completed\":{},\"passed\":{}}}"
+            ),
+            running,
+            killed,
+            waited,
+            passed
         );
     } else {
         println!("self-child-termination: {}", if passed { "pass" } else { "fail" });
