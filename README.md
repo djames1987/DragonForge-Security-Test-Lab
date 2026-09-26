@@ -1,5 +1,9 @@
 # DragonForge Security Test Lab
 
+<p align="center">
+  <img src="docs/assets/readme/phase-05-hero.svg" alt="DragonForge Security Test Lab banner showing an independent controller, safety-policy boundary, target boundary, and evidence output" width="100%">
+</p>
+
 DragonForge Security Test Lab (DFSTL) is an independent security-validation framework for DragonForge Security Suite. It is intentionally maintained outside the product it tests so validation can challenge product assumptions instead of trusting the same runtime, libraries, or implementation paths by default.
 
 > **Status:** Phase 11 — Windows Multi-User & ACL Security Testing is implementation complete with verification pending. Phases 0–10 are recorded as verified complete in the project roadmap.
@@ -39,6 +43,21 @@ Tests are divided into four execution classes:
 
 Higher-risk classes are never meant to be silently treated as default tests. See [SAFETY.md](SAFETY.md) and [Test Taxonomy](docs/TEST_TAXONOMY.md).
 
+### Safety and evidence flow
+
+```mermaid
+flowchart LR
+    Operator[Operator] --> Controller[DFSTL Controller]
+    Controller --> Policy{Safety policy}
+    Policy -->|Safe| Target[Explicit test target]
+    Policy -->|Controlled / Disruptive / LabOnly| Gate[Explicit opt-in + required lab boundary]
+    Gate --> Target
+    Target --> Recorder[Bounded evidence recorder]
+    Recorder --> Reports[Hashed machine + human reports]
+```
+
+This diagram is intentionally high level: it explains trust separation and gating without exposing offensive operational instructions.
+
 ## Architecture
 
 ```text
@@ -53,6 +72,10 @@ scripts/             Windows validation harnesses
 The current Cargo workspace is intentionally small. At the last dependency audit, the CLI depended only on the first-party core crate; future third-party dependencies must be reviewed rather than assumed compatible.
 
 See [Architecture](docs/ARCHITECTURE.md) and [Threat Model](docs/THREAT_MODEL.md).
+
+### Public visual captures
+
+DFSTL is primarily a CLI/evidence framework, so Phase 5 does not invent a graphical dashboard or publish sensitive lab output. A safe screenshot/report set using real executions and synthetic fixtures is defined in [Public Visual Capture](docs/PUBLIC_SCREENSHOT_CAPTURE.md).
 
 ## Safe evaluation
 
@@ -93,6 +116,7 @@ For vulnerability-reporting guidance, see [SECURITY.md](SECURITY.md). The curren
 - [Test Taxonomy](docs/TEST_TAXONOMY.md) — classification of validation work
 - [Roadmap](docs/ROADMAP.md) — full implementation history and planned phases
 - [Report Schema](docs/REPORT_SCHEMA.md) — finalized evidence/report contract
+- [Public Visual Capture](docs/PUBLIC_SCREENSHOT_CAPTURE.md) — synthetic evidence/screenshot capture rules
 - [Third-party notices](THIRD_PARTY_NOTICES.md) — current dependency/material status
 - [`docs/`](docs/) — phase records and specialized evidence/mutation schemas
 
