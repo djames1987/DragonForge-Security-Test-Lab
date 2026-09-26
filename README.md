@@ -367,3 +367,11 @@ cargo run -p dfstl-cli -- run --output .\results
 DFSTL is a security-testing framework. Future phases will include tests that can intentionally crash processes, create malformed data, manipulate temporary filesystem objects, or stress local services. Those capabilities must remain gated behind the safety model defined in this repository.
 
 Do not point future disruptive/lab-only tests at systems, services, accounts, or networks you do not own or have explicit authorization to test.
+
+## License
+
+Copyright © 2026 David James. All rights reserved.
+
+This repository is source-visible for evaluation, portfolio review, security review, and reference, but it is **not open source**. Except for rights expressly required by GitHub's Terms of Service for public repositories, no general license is granted to use, copy, modify, redistribute, sublicense, sell, commercially exploit, or incorporate original DragonForge material into another work.
+
+See [LICENSE](LICENSE) for the governing notice. Third-party components remain subject to their own licenses and independent rights.
