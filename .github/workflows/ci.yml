@@ -68,5 +68,11 @@ jobs:
           cargo run -p dfstl-cli -- windows-acl analyze --input $Snapshot --output (Join-Path $Root "analysis") --lab-ack --json
           if ($LASTEXITCODE -ne 0) { throw "ACL analyzer clean fixture failed" }
 
+      - name: LabOnly runner regression
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        run: |
+          $Root = Join-Path $PWD "ci-phase11"
+          New-Item -ItemType Directory -Force -Path $Root | Out-Null
           cargo run -p dfstl-cli -- run --lab-ack --output (Join-Path $Root "lab-runner")
           if ($LASTEXITCODE -ne 0) { throw "LabOnly runner regression failed" }
