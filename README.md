@@ -1,377 +1,113 @@
 # DragonForge Security Test Lab
 
-DragonForge Security Test Lab (DFSTL) is an independent security-validation framework for the DragonForge Security Suite.
+DragonForge Security Test Lab (DFSTL) is an independent security-validation framework for DragonForge Security Suite. It is intentionally maintained outside the product it tests so validation can challenge product assumptions instead of trusting the same runtime, libraries, or implementation paths by default.
 
-DFSTL is intentionally maintained as a separate project from the product it tests. Its purpose is to validate DragonForge from both white-box and black-box perspectives without implicitly trusting the product's own runtime, libraries, or assumptions.
+> **Status:** Phase 11 — Windows Multi-User & ACL Security Testing is implementation complete with verification pending. Phases 0–10 are recorded as verified complete in the project roadmap.
 
-## Project status
+## What DFSTL is for
 
-**Phase 11 — Windows Multi-User & ACL Security Testing: Implementation Complete — Verification Pending**
+DFSTL provides repeatable white-box and black-box security tests with explicit safety classifications, synthetic secrets, immutable evidence, and clear separation between a product failure and a lab/infrastructure failure.
 
-Phases 0 through 10 are verified complete. Phase 11 adds elevated disposable Windows multi-user ACL testing, real cross-user read/write probes, inherited-permission validation, and bounded ACL evidence analysis.
+The framework currently covers areas such as:
 
-Phase 8 built-in fuzz generation is Controlled-class and side-effect free with respect to DragonForge targets. cargo-fuzz targets exercise bounded parser/shape logic without network or product-data side effects.
+- target discovery and build identification without executing the target;
+- source, dependency, workflow, SBOM, and secret-oriented static analysis;
+- bounded encrypted-format mutation testing;
+- authenticated Agent/runtime boundary testing;
+- filesystem, path, reparse-point, hard-link, and TOCTOU laboratory scenarios;
+- loopback-only Password Manager sync/API probing and offline mutation corpora;
+- fuzz/regression corpus generation and promotion;
+- synthetic secret-leak and offline dump scanning;
+- bounded failure injection and resource-stress scenarios;
+- disposable Windows multi-user and ACL validation;
+- finalized evidence bundles with hashes and machine-readable reports.
 
-## Design principles
+The repository also retains security regressions as permanent fixtures so previously discovered classes of failure can remain covered.
 
-- Safe by default.
-- Destructive or disruptive tests must require explicit opt-in.
-- Tests must be reproducible and evidence-producing.
-- The target must never be silently modified outside an explicitly authorized test scope.
-- Black-box testing is preferred where integration behavior matters.
-- White-box testing is allowed when it adds coverage that cannot be obtained externally.
-- Security regressions become permanent test cases.
-- Secrets used during testing must be synthetic.
-- Test output must avoid leaking real credentials or protected data.
-- Unsafe Rust is forbidden unless a future documented exception is approved.
-- The framework must distinguish a test failure from an infrastructure failure.
+## Trust separation
 
-## Initial workspace
+A security test framework is most useful when the tester and target do not share implicit trust. DFSTL therefore keeps its runner, evidence model, synthetic fixtures, and safety policy in its own repository.
+
+Tests are divided into four execution classes:
+
+| Class | Intended boundary |
+| --- | --- |
+| **Safe** | Read-only or isolated operations suitable for an ordinary development workstation |
+| **Controlled** | Temporary adversarial inputs or bounded local test resources with explicit opt-in |
+| **Disruptive** | Operations that may terminate test processes, consume meaningful resources, or alter temporary test state |
+| **LabOnly** | Operations restricted to disposable/dedicated lab environments or accounts |
+
+Higher-risk classes are never meant to be silently treated as default tests. See [SAFETY.md](SAFETY.md) and [Test Taxonomy](docs/TEST_TAXONOMY.md).
+
+## Architecture
 
 ```text
-DragonForge-Security-Test-Lab/
-├── apps/
-│   └── dfstl-cli/          # Primary test-controller CLI
-├── crates/
-│   └── dfstl-core/         # Runner, safety, evidence, hashing, and reports
-├── config/
-│   └── lab.example.toml    # Example lab-only configuration
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── PHASE_0_FOUNDATION.md
-│   ├── PHASE_1_CORE_RUNNER.md
-│   ├── PHASE_2_TARGET_DISCOVERY.md
-│   ├── PHASE_3_STATIC_SUPPLY_CHAIN.md
-│   ├── PHASE_4_ENCRYPTED_FORMATS.md
-│   ├── PHASE_5_AGENT_HARNESS.md
-│   ├── PHASE_6_FILESYSTEM_LAB.md
-│   ├── PHASE_7_SYNC_API_HARNESS.md
-│   ├── PHASE_8_FUZZING_REGRESSION.md
-│   ├── PHASE_9_SECRET_MEMORY.md
-│   ├── PHASE_10_FAILURE_RESOURCE.md
-│   ├── PHASE_11_WINDOWS_ACL.md
-│   ├── WINDOWS_ACL_SCHEMA.md
-│   ├── FAILURE_RESOURCE_SCHEMA.md
-│   ├── SECRET_LEAK_SCHEMA.md
-│   ├── FUZZ_CORPUS_SCHEMA.md
-│   ├── SYNC_API_MUTATION_SCHEMA.md
-│   ├── FILESYSTEM_LAB_SCHEMA.md
-│   ├── AGENT_ATTACK_SCHEMA.md
-│   ├── ENCRYPTED_MUTATION_SCHEMA.md
-│   ├── REPORT_SCHEMA.md
-│   ├── STATIC_SCAN_SCHEMA.md
-│   ├── TARGET_IDENTIFICATION_SCHEMA.md
-│   ├── ROADMAP.md
-│   ├── TEST_TAXONOMY.md
-│   └── THREAT_MODEL.md
-├── .github/workflows/ci.yml
-├── SAFETY.md
-├── SECURITY.md
-├── Cargo.toml
-└── rust-toolchain.toml
+apps/dfstl-cli/      test-controller CLI
+crates/dfstl-core/   runner, policy, evidence, hashing, and reports
+config/              example lab configuration
+corpus/              intentional synthetic/regression security fixtures
+docs/                architecture, schemas, threat model, roadmap, phase records
+scripts/             Windows validation harnesses
 ```
 
-## Safety classes
+The current Cargo workspace is intentionally small. At the last dependency audit, the CLI depended only on the first-party core crate; future third-party dependencies must be reviewed rather than assumed compatible.
 
-DFSTL defines four execution classes:
+See [Architecture](docs/ARCHITECTURE.md) and [Threat Model](docs/THREAT_MODEL.md).
 
-- **Safe** — read-only or isolated operations expected to be safe on a development workstation.
-- **Controlled** — creates temporary attack inputs or local test resources and performs bounded adversarial interaction.
-- **Disruptive** — may terminate test processes, consume significant resources, or alter temporary test state.
-- **LabOnly** — requires an isolated/disposable lab such as a VM snapshot, dedicated test account, or dedicated network.
+## Safe evaluation
 
-The Phase 0 core library deliberately prevents higher-risk classes from being treated as ordinary default tests.
-
-See [SAFETY.md](SAFETY.md) and [docs/TEST_TAXONOMY.md](docs/TEST_TAXONOMY.md).
-
-## Roadmap
-
-- Phase 0 — Architecture, safety model, and test taxonomy: **Verified Complete**
-- Phase 1 — Core runner, evidence logging, and reporting: **Verified Complete**
-- Phase 2 — DragonForge discovery and build identification: **Verified Complete**
-- Phase 3 — Static, dependency, supply-chain, and secret scanning: **Verified Complete**
-- Phase 4 — Encrypted-format adversarial testing: **Verified Complete**
-- Phase 5 — DragonForge Agent attack harness: **Verified Complete**
-- Phase 6 — Filesystem, reparse-point, and TOCTOU laboratory: **Verified Complete**
-- Phase 7 — Password Manager sync/API attack harness: **Verified Complete**
-- Phase 8 — Fuzzing and security-regression corpus: **Verified Complete**
-- Phase 9 — Secret-leak and memory-lifecycle testing: **Verified Complete**
-- Phase 10 — Failure injection and resource-exhaustion testing: **Verified Complete**
-- Phase 11 — Windows multi-user and ACL security testing: **Implementation Complete — Verification Pending**
-- Phase 12 — VM and multi-machine orchestration
-- Phase 13 — CI security gates and release validation
-
-See [docs/ROADMAP.md](docs/ROADMAP.md).
-
-## Phase 1 runner
+Start with the framework's read-only/safe surfaces rather than higher-risk lab operations:
 
 ```powershell
 cargo run -p dfstl-cli -- list
-cargo run -p dfstl-cli -- run --output .\results
 cargo run -p dfstl-cli -- target inspect --target C:\DragonForge-Test-Build
 ```
 
-Each completed run creates a finalized evidence directory containing `report.json`, `report.txt`, `SHA256SUMS`, and any per-test artifacts.
+A completed runner execution produces a finalized evidence directory containing machine-readable and human-readable reports plus SHA-256 evidence manifests.
 
-See [docs/PHASE_1_CORE_RUNNER.md](docs/PHASE_1_CORE_RUNNER.md) and [docs/REPORT_SCHEMA.md](docs/REPORT_SCHEMA.md).
+Repository validation can be run with the phase-specific PowerShell harnesses documented under [`docs/`](docs/). LabOnly and disruptive scenarios should only be run in the environment required by their documentation and with the explicit acknowledgement flags described there.
 
-## Phase 2 target identification
+## Safety and security boundaries
 
-```powershell
-cargo run -p dfstl-cli -- target inspect --target C:\DragonForge-Test-Build
-cargo run -p dfstl-cli -- target inspect --target C:\DragonForge-Test-Build --json
-```
+DFSTL is a defensive validation project, not an attack cookbook.
 
-DFSTL reads and hashes the explicit target; it does not execute DragonForge binaries. The current Windows package contract contains 11 expected executables.
+- Test credentials and secrets must be synthetic.
+- Generated evidence must not serialize real protected data.
+- Live network probing is intentionally narrow; the Password Manager sync harness is restricted to explicit IPv4 loopback targets.
+- Mutation tooling works from copied/synthetic inputs and does not overwrite live product state by default.
+- Resource-stress paths are bounded and isolated to lab-owned processes/resources.
+- Process-termination testing targets DFSTL-owned child processes rather than arbitrary system processes.
+- Windows multi-user/ACL scenarios use temporary accounts and disposable test roots and require an elevated lab context.
+- Failure of an external tool or lab prerequisite is not automatically interpreted as a clean security result.
 
-See [docs/PHASE_2_TARGET_DISCOVERY.md](docs/PHASE_2_TARGET_DISCOVERY.md) and [docs/TARGET_IDENTIFICATION_SCHEMA.md](docs/TARGET_IDENTIFICATION_SCHEMA.md).
+The checked-in `corpus/` contains intentional synthetic/regression material that may resemble secrets. It is test data and should not be removed merely because secret scanners recognize its patterns.
 
-## Phase 11 Windows multi-user and ACL testing
+For vulnerability-reporting guidance, see [SECURITY.md](SECURITY.md). The current security policy document should be read together with the live roadmap because some early foundation wording predates the current Phase 11 implementation state.
 
-Run the full Phase 11 verifier from an **elevated Windows PowerShell** session:
+## Documentation
 
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-phase11-tests.ps1 -Release
-```
+- [Safety Policy](SAFETY.md) — execution classes and operator rules
+- [Security Policy](SECURITY.md) — security reporting and project boundaries
+- [Architecture](docs/ARCHITECTURE.md) — runner and evidence design
+- [Threat Model](docs/THREAT_MODEL.md) — adversaries and trust assumptions
+- [Test Taxonomy](docs/TEST_TAXONOMY.md) — classification of validation work
+- [Roadmap](docs/ROADMAP.md) — full implementation history and planned phases
+- [Report Schema](docs/REPORT_SCHEMA.md) — finalized evidence/report contract
+- [Third-party notices](THIRD_PARTY_NOTICES.md) — current dependency/material status
+- [`docs/`](docs/) — phase records and specialized evidence/mutation schemas
 
-The verifier creates two temporary non-admin local accounts (owner and cross-user), applies explicit ACLs to a disposable DragonForge-shaped lab under `C:\Users\Public`, performs real cross-user read/write probes, captures an ACL snapshot, validates an intentionally unsafe inherited ACL fixture, and removes the temporary account/lab state during cleanup.
+Detailed operational procedures remain in the phase-specific documents so the root landing page can stay focused on purpose, safety, and evaluation.
 
-Offline ACL evidence can be analyzed with:
+## Limitations
 
-```powershell
-cargo run -p dfstl-cli -- windows-acl analyze --input .\acl-snapshot.tsv --output .\results\phase11-acl --lab-ack
-```
+Phase 11 verification is still pending, so its implementation should not be described as fully qualified yet. Future phases also remain planned for broader VM/multi-machine orchestration and CI/release security gates.
 
-See [docs/PHASE_11_WINDOWS_ACL.md](docs/PHASE_11_WINDOWS_ACL.md) and [docs/WINDOWS_ACL_SCHEMA.md](docs/WINDOWS_ACL_SCHEMA.md).
+DFSTL itself is not a substitute for an independent external security audit, professional penetration test, or formal assurance process. Its evidence shows what its defined tests observed under their stated assumptions and environments.
 
-## Phase 10 failure injection and resource exhaustion
-
-```powershell
-cargo run -p dfstl-cli -- failure inject --root .\results\phase10-lab --output .\results\phase10-failure --controlled
-cargo run -p dfstl-cli -- failure resource --output .\results\phase10-resource --lab-ack
-cargo run -p dfstl-cli -- failure process-termination --lab-ack
-```
-
-The fault matrix uses synthetic writers and disposable staging roots. Resource stress is hard-capped, uses loopback sockets only, and process termination targets only a DFSTL self-child worker.
-
-See [docs/PHASE_10_FAILURE_RESOURCE.md](docs/PHASE_10_FAILURE_RESOURCE.md) and [docs/FAILURE_RESOURCE_SCHEMA.md](docs/FAILURE_RESOURCE_SCHEMA.md).
-
-## Local Phase 10 validation
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-phase10-tests.ps1 -Release
-```
-
-The validator checks failure/recovery consistency, SHA-256 evidence, over-budget refusal, bounded CPU/memory/socket stress, self-child termination, and Safe/Controlled/LabOnly policy boundaries.
-
-## Phase 9 secret leak and memory lifecycle testing
-
-```powershell
-cargo run -p dfstl-cli -- secret-leak scan --root .\diagnostics --sentinels .\corpus\seeds\phase9-sentinels.txt --output .\results\phase9-scan --controlled
-cargo run -p dfstl-cli -- secret-leak memory-check --controlled
-```
-
-Offline process-dump analysis is LabOnly:
-
-```powershell
-cargo run -p dfstl-cli -- secret-leak dump-scan --dump C:\lab\process.dmp --sentinels .\corpus\seeds\phase9-sentinels.txt --output .\results\phase9-dump --lab-ack
-```
-
-Reports detect raw, hex, Base64, and UTF-16LE forms but never serialize sentinel values or dump contents.
-
-See [docs/PHASE_9_SECRET_MEMORY.md](docs/PHASE_9_SECRET_MEMORY.md) and [docs/SECRET_LEAK_SCHEMA.md](docs/SECRET_LEAK_SCHEMA.md).
-
-## Local Phase 9 validation
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-phase9-tests.ps1 -Release
-```
-
-The validator proves both clean-artifact behavior and intentional leak detection, verifies redaction-safe evidence hashes, exercises offline dump scanning, and checks Safe/Controlled/LabOnly policy boundaries.
-
-## Phase 8 fuzzing and regression corpus
-
-```powershell
-cargo run -p dfstl-cli -- fuzz corpus --target agent-json --input .\corpus\seeds\agent-json.json --output .\results\fuzz-agent-json --controlled --seed 42 --count 32
-cargo run -p dfstl-cli -- fuzz promote --target windows-path --input .\candidate.bin --regression-root .\corpus\regression --controlled --note "security invariant"
-```
-
-Phase 8 also includes an isolated `fuzz/` cargo-fuzz project with encrypted-format, Agent JSON, sync HTTP, and Windows path targets.
-
-See [docs/PHASE_8_FUZZING_REGRESSION.md](docs/PHASE_8_FUZZING_REGRESSION.md) and [docs/FUZZ_CORPUS_SCHEMA.md](docs/FUZZ_CORPUS_SCHEMA.md).
-
-## Local Phase 8 validation
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-phase8-tests.ps1 -Release
-```
-
-The validator checks deterministic corpus generation, minimization, regression promotion/no-overwrite, checked-in fixture hashes, cargo-fuzz scaffolding, SHA-256 corpus evidence, and Safe/Controlled/LabOnly runner behavior.
-
-## Phase 7 Password Manager sync/API harness
-
-```powershell
-cargo run -p dfstl-cli -- sync-api probe --base-url http://127.0.0.1:8787 --controlled
-cargo run -p dfstl-cli -- sync-api mutate --input .\capture.http --output .\results\sync-api-mutations --controlled
-```
-
-The live probe is restricted to an explicit IPv4-loopback sync server and performs only non-state-changing checks. Captured request mutations are generated offline and are never transmitted automatically.
-
-See [docs/PHASE_7_SYNC_API_HARNESS.md](docs/PHASE_7_SYNC_API_HARNESS.md) and [docs/SYNC_API_MUTATION_SCHEMA.md](docs/SYNC_API_MUTATION_SCHEMA.md).
-
-## Local Phase 7 validation
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-phase7-tests.ps1 -Release
-```
-
-The validator checks the protocol-v2 model, deterministic loopback probe, 12-case offline mutation corpus, source immutability, SHA-256 evidence, and Safe/Controlled/LabOnly runner behavior.
-
-## Phase 6 filesystem lab
-
-```powershell
-cargo run -p dfstl-cli -- filesystem path-corpus
-cargo run -p dfstl-cli -- filesystem lab --root C:\DFSTL-Lab\phase6-run --lab-ack
-```
-
-The path corpus is read-only. The filesystem executor is LabOnly, requires an explicit acknowledgement, and refuses an existing lab root.
-
-See [docs/PHASE_6_FILESYSTEM_LAB.md](docs/PHASE_6_FILESYSTEM_LAB.md) and [docs/FILESYSTEM_LAB_SCHEMA.md](docs/FILESYSTEM_LAB_SCHEMA.md).
-
-## Local Phase 6 validation
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-phase6-tests.ps1 -Release
-```
-
-The validator uses a disposable root beneath ignored results and checks path policy, containment, hard-link semantics, TOCTOU races, reparse reporting, evidence hashes, and Safe/Controlled/LabOnly policy enforcement.
-
-## Phase 5 Agent attack harness
-
-```powershell
-cargo run -p dfstl-cli -- agent attack --runtime-dir C:\Path\To\AgentRuntime --controlled
-cargo run -p dfstl-cli -- agent runtime-mutate --runtime-dir C:\Path\To\AgentRuntime --output .\results\agent-runtime-corpus --controlled
-```
-
-The live harness is restricted to the explicit DragonForge Agent runtime descriptor and IPv4 loopback. Runtime-file mutation uses cloned fixtures and never overwrites the live runtime files.
-
-See [docs/PHASE_5_AGENT_HARNESS.md](docs/PHASE_5_AGENT_HARNESS.md) and [docs/AGENT_ATTACK_SCHEMA.md](docs/AGENT_ATTACK_SCHEMA.md).
-
-## Local Phase 5 validation
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-phase5-tests.ps1 -Release
-```
-
-The deterministic validator uses synthetic runtime files and an in-process loopback mock Agent; it does not require or alter a live DragonForge Agent.
-
-## Phase 4 encrypted-format mutation
-
-```powershell
-cargo run -p dfstl-cli -- format mutate --format dfbackup --input C:\fixtures\seed.dfbackup --output .\results\backup-corpus --controlled
-```
-
-Mutation is Controlled-class and is refused unless `--controlled` is supplied. The original seed is read-only; DFSTL writes only to a new output directory and produces a SHA-256 manifest for the corpus.
-
-See [docs/PHASE_4_ENCRYPTED_FORMATS.md](docs/PHASE_4_ENCRYPTED_FORMATS.md) and [docs/ENCRYPTED_MUTATION_SCHEMA.md](docs/ENCRYPTED_MUTATION_SCHEMA.md).
-
-## Local Phase 4 validation
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-phase4-tests.ps1 -Release
-```
-
-The validator uses disposable synthetic seeds for all five format profiles and validates the Controlled safety gate, mutation matrices, non-overwrite behavior, seed immutability, corpus manifests, and runner policy behavior.
-
-## Phase 3 source scanning
-
-```powershell
-cargo run -p dfstl-cli -- source scan --source C:\DragonForge-Security-Suite --output .\results\suite-static
-cargo run -p dfstl-cli -- source scan --source C:\DragonForge-Security-Suite --output .\results\suite-static --external
-```
-
-Built-in scanning is read-only and produces `static-scan.json`, `static-scan.txt`, `dependency-inventory.json`, and `sbom.spdx.json`. External tool coverage is reported separately so missing tools are never treated as a clean pass.
-
-See [docs/PHASE_3_STATIC_SUPPLY_CHAIN.md](docs/PHASE_3_STATIC_SUPPLY_CHAIN.md) and [docs/STATIC_SCAN_SCHEMA.md](docs/STATIC_SCAN_SCHEMA.md).
-
-## Local Phase 3 validation
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-phase3-tests.ps1 -Release
-```
-
-The validator uses only disposable synthetic source fixtures and verifies dependency/SBOM output, workflow findings, secret detection/redaction, and the Safe runner regression.
-
-## Local Phase 2 validation
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-phase2-tests.ps1 -Release
-```
-
-The validator builds only disposable synthetic target fixtures and proves complete, incomplete, single-candidate, and ambiguous-candidate behavior.
-
-## Local Phase 1 validation
-
-Run the full Windows validation harness:
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-phase1-tests.ps1 -Release
-```
-
-The validator independently parses the generated JSON report and recomputes every evidence-manifest SHA-256. It writes a timestamped log and SHA-256 sidecar under `test-logs/`.
-
-## Local Phase 0 validation
-
-On Windows, run the complete validation harness from the repository root:
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-phase0-tests.ps1
-```
-
-Or double-click/run:
-
-```text
-scripts\run-phase0-tests.cmd
-```
-
-For an additional release-mode test pass:
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-phase0-tests.ps1 -Release
-```
-
-The validator records environment/tool versions, repository branch/commit/cleanliness, required Phase 0 files, Cargo metadata, rustfmt, strict Clippy, debug tests, optional release tests, CLI safety invariants, and a release build. It writes a timestamped log and SHA-256 sidecar under `test-logs/`.
-
-Example:
-
-```text
-test-logs\phase0-validation-20260923-134500.log
-test-logs\phase0-validation-20260923-134500.log.sha256
-```
-
-Upload the `.log` file for review if validation fails or when recording Phase 0 verification evidence.
-
-## Development
-
-```powershell
-cargo fmt --all --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
-cargo run -p dfstl-cli -- describe
-cargo run -p dfstl-cli -- list
-cargo run -p dfstl-cli -- run --output .\results
-```
-
-## Important
-
-DFSTL is a security-testing framework. Future phases will include tests that can intentionally crash processes, create malformed data, manipulate temporary filesystem objects, or stress local services. Those capabilities must remain gated behind the safety model defined in this repository.
-
-Do not point future disruptive/lab-only tests at systems, services, accounts, or networks you do not own or have explicit authorization to test.
-
-## License
+## Licensing
 
 Copyright © 2026 David James. All rights reserved.
 
-This repository is source-visible for evaluation, portfolio review, security review, and reference, but it is **not open source**. Except for rights expressly required by GitHub's Terms of Service for public repositories, no general license is granted to use, copy, modify, redistribute, sublicense, sell, commercially exploit, or incorporate original DragonForge material into another work.
+Original DragonForge material in this repository is **source-visible, not open source**. Except for rights expressly required by GitHub's Terms of Service for public repositories, no general permission is granted to use, copy, modify, redistribute, sublicense, sell, commercially exploit, or incorporate original DragonForge material into another work.
 
-See [LICENSE](LICENSE) for the governing notice. Third-party components remain subject to their own licenses and independent rights.
+See [LICENSE](LICENSE) for the full DragonForge Proprietary Source Notice. Third-party material retains its independent rights; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
