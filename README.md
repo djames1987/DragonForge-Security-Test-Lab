@@ -105,7 +105,7 @@ DFSTL is a defensive validation project, not an attack cookbook.
 
 The checked-in `corpus/` contains intentional synthetic/regression material that may resemble secrets. It is test data and should not be removed merely because secret scanners recognize its patterns.
 
-For vulnerability-reporting guidance, see [SECURITY.md](SECURITY.md). The current security policy document should be read together with the live roadmap because some early foundation wording predates the current Phase 11 implementation state.
+For vulnerability-reporting guidance, see [SECURITY.md](SECURITY.md). Its current-status section is aligned with the Phase 11 implementation/verification state and should be read alongside the live roadmap for future phase changes.
 
 ## Documentation
 
